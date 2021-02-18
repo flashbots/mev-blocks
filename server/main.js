@@ -23,13 +23,13 @@ const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const sql = postgres(process.env.POSTGRES_DSN)
 
 /**
- * @api {get} /v1/transactions?before=BLOCK_NUMBER Get transactions
+ * @api {get} /v1/transactions Get transactions
  * @apiVersion 1.0.0
  * @apiGroup Flashbots
- * @apiDescription Returns the 100 most recent flashbots transactions. Use the `before` param to query transactions before a given block number.
+ * @apiDescription Returns the 100 most recent flashbots transactions. Use the `before` query param to filter to transactions before a given block number.
  *
- * @apiParam {Number}   before =latest  Filter transactions to before this block number (exclusive, does not include this block number)
- * @apiParam {Number}   limit =100  Number of transactions that are returned
+ * @apiParam (Query string) {Number}   [before=latest]  Filter transactions to before this block number (exclusive, does not include this block number)
+ * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of transactions that are returned
  *
  * @apiSuccess {Object[]} transactions       List of transactions.
  * @apiSuccess {String}   transactions.transaction_hash transaction hash
@@ -91,10 +91,10 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @api {get} /v1/blocks Get blocks
  * @apiVersion 1.0.0
  * @apiGroup Flashbots
- * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use the `before` param to query transactions before a given block number.
+ * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use the `before` query param to filter to blocks before a given block number.
  *
- * @apiParam {Number}   before =latest  Filter blocks to before this block number (exclusive, does not include this block number)
- * @apiParam {Number}   limit =100  Number of blocks that are returned
+ * @apiParam (Query string) {Number}   [before=latest]  Filter blocks to before this block number (exclusive, does not include this block number)
+ * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
  *
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   block_number
