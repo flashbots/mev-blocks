@@ -10,8 +10,9 @@
     "start": "node server/main.js"
   },
   "apidoc": {
-    "title": "Flashbots etherscan api",
-    "url": "https://etherscan.flashbots.net"
+    "title": "Flashbots-Etherscan api",
+    "url": "https://etherscan.flashbots.net",
+    "description": "An API for bridging between Flashbots and Etherscan"
   },
   "dependencies": {
     "@sentry/node": "^6.1.0",
