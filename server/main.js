@@ -23,9 +23,13 @@ const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const sql = postgres(process.env.POSTGRES_DSN)
 
 /**
- * @api {get} /v1/transactions Get transactions
+ * @api {get} /v1/transactions?before=BLOCK_NUMBER Get transactions
  * @apiVersion 1.0.0
  * @apiGroup Flashbots
+ * @apiDescription Returns the 100 most recent flashbots transactions. Use the `before` param to query transactions before a given block number.
+ *
+ * @apiParam {Number}   before =latest  Filter transactions to before this block number (exclusive, does not include this block number)
+ * @apiParam {Number}   limit =100  Number of transactions that are returned
  *
  * @apiSuccess {Object[]} transactions       List of transactions.
  * @apiSuccess {String}   transactions.transaction_hash transaction hash
@@ -45,15 +49,52 @@ const sql = postgres(process.env.POSTGRES_DSN)
   ]
 }
  */
-app.get('/v1/transactions', async (req, res) => {
-  const transactions = await sql`select transaction_hash, block_number from mined_bundles order by block_number desc limit 100`
-  res.json({ transactions })
+app.get('/v1/transactions', async (req, res, next) => {
+  try {
+    let before = req.query.before
+    if (before === 'latest') {
+      before = ''
+    }
+    let limit = parseInt(req.query.limit)
+    if (isNaN(limit)) {
+      limit = 100
+    }
+    if (limit < 0 || limit > 10000) {
+      res.status(400)
+      res.json({ error: `invalid limit param provided, must be less than 10000 and more than 0: ${req.query.limit}` })
+      return
+    }
+
+    let transactions
+    if (before) {
+      const beforeInt = parseInt(before)
+      if (isNaN(beforeInt)) {
+        res.status(400)
+        res.json({ error: `invalid before param provided, expected a number but got: ${before}` })
+        return
+      }
+      transactions = await sql`select transaction_hash, block_number from mined_bundles where block_number < ${beforeInt} order by block_number desc limit ${limit}`
+    } else {
+      transactions = await sql`select transaction_hash, block_number from mined_bundles order by block_number desc limit ${limit}`
+    }
+
+    res.json({ transactions })
+  } catch (error) {
+    console.error('unhandled error in /transactions', error)
+    Sentry.captureException(error)
+    res.status(500)
+    res.end('Internal Server Error')
+  }
 })
 
 /**
  * @api {get} /v1/blocks Get blocks
  * @apiVersion 1.0.0
  * @apiGroup Flashbots
+ * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use the `before` param to query transactions before a given block number.
+ *
+ * @apiParam {Number}   before =latest  Filter blocks to before this block number (exclusive, does not include this block number)
+ * @apiParam {Number}   limit =100  Number of blocks that are returned
  *
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   block_number
@@ -83,19 +124,53 @@ app.get('/v1/transactions', async (req, res) => {
  */
 app.get('/v1/blocks', async (req, res) => {
   /* eslint-disable camelcase */
-  const rows = await sql`select transaction_hash, block_number, miner_reward, gas_used, gas_price from mined_bundles order by block_number desc limit 100`
-  const blocks = _.map(rows, ({ transaction_hash, block_number, miner_reward, gas_used, gas_price }) => {
-    return {
-      transactions: _.map(transaction_hash.split(','), (tx) => {
-        return { transaction_hash: tx }
-      }),
-      block_number,
-      miner_reward,
-      gas_used,
-      gas_price
+  try {
+    let before = req.query.before
+    if (before === 'latest') {
+      before = ''
     }
-  })
-  res.json({ blocks })
+    let limit = parseInt(req.query.limit)
+    if (isNaN(limit)) {
+      limit = 100
+    }
+    if (limit < 0 || limit > 10000) {
+      res.status(400)
+      res.json({ error: `invalid limit param provided, must be less than 10000 and more than 0: ${req.query.limit}` })
+      return
+    }
+
+    let rows
+    if (before) {
+      const beforeInt = parseInt(before)
+      if (isNaN(beforeInt)) {
+        res.status(400)
+        res.json({ error: `invalid before param provided, expected a number but got: ${before}` })
+        return
+      }
+      rows = await sql`select transaction_hash, block_number, miner_reward, gas_used, gas_price from mined_bundles where block_number < ${beforeInt} order by block_number desc limit ${limit}`
+    } else {
+      rows = await sql`select transaction_hash, block_number, miner_reward, gas_used, gas_price from mined_bundles order by block_number desc limit ${limit}`
+    }
+
+    const blocks = _.map(rows, ({ transaction_hash, block_number, miner_reward, gas_used, gas_price }) => {
+      return {
+        transactions: _.map(transaction_hash.split(','), (tx) => {
+          return { transaction_hash: tx }
+        }),
+        block_number,
+        miner_reward,
+        gas_used,
+        gas_price
+      }
+    })
+
+    res.json({ blocks })
+  } catch (error) {
+    console.error('unhandled error in /transactions', error)
+    Sentry.captureException(error)
+    res.status(500)
+    res.end('Internal Server Error')
+  }
 })
 
 app.use(express.static('apidoc'))
