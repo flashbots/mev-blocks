@@ -1,0 +1,12 @@
+{
+  "root": true,
+  "extends": ["prettier", "standard"],
+  "plugins": ["prettier"],
+  "env": {
+    "mocha": true
+  },
+  "rules": {
+    "prettier/prettier": ["error"],
+    "space-before-function-paren": "off"
+  }
+}
