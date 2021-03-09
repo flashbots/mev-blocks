@@ -65,18 +65,27 @@ app.get('/v1/transactions', async (req, res, next) => {
       return
     }
 
-    let transactions
+    let beforeInt
     if (before) {
-      const beforeInt = parseInt(before)
+      beforeInt = parseInt(before)
       if (isNaN(beforeInt)) {
         res.status(400)
         res.json({ error: `invalid before param provided, expected a number but got: ${before}` })
         return
       }
-      transactions = await sql`select transaction_hash, block_number from mined_bundles where block_number < ${beforeInt} order by block_number desc limit ${limit}`
-    } else {
-      transactions = await sql`select transaction_hash, block_number from mined_bundles order by block_number desc limit ${limit}`
     }
+    const transactions = await sql`
+      select
+          transaction_hash,
+          block_number
+      from
+          mined_bundle_txs
+      where
+          (${beforeInt || null}::int is null or block_number < ${beforeInt})
+      order by
+          block_number desc
+      limit
+          ${limit}`
 
     res.json({ transactions })
   } catch (error) {
@@ -93,6 +102,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiGroup Flashbots
  * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use the `before` query param to filter to blocks before a given block number.
  *
+ * @apiParam (Query string) {Number}   [block_number]  Returns just a single block_number
  * @apiParam (Query string) {Number}   [before=latest]  Filter blocks to before this block number (exclusive, does not include this block number)
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
  *
@@ -122,7 +132,7 @@ app.get('/v1/transactions', async (req, res, next) => {
   ]
 }
  */
-app.get('/v1/blocks', async (req, res) => {
+app.get('/v1/blocks/:block_number?', async (req, res) => {
   /* eslint-disable camelcase */
   try {
     let before = req.query.before
@@ -139,18 +149,41 @@ app.get('/v1/blocks', async (req, res) => {
       return
     }
 
-    let rows
+    let beforeInt
     if (before) {
-      const beforeInt = parseInt(before)
+      beforeInt = parseInt(before)
       if (isNaN(beforeInt)) {
         res.status(400)
         res.json({ error: `invalid before param provided, expected a number but got: ${before}` })
         return
       }
-      rows = await sql`select transaction_hash, block_number, miner_reward, gas_used, gas_price from mined_bundles where block_number < ${beforeInt} order by block_number desc limit ${limit}`
-    } else {
-      rows = await sql`select transaction_hash, block_number, miner_reward, gas_used, gas_price from mined_bundles order by block_number desc limit ${limit}`
     }
+
+    let blockNumInt
+    if (req.query.block_number) {
+      blockNumInt = parseInt(req.query.block_number)
+      if (isNaN(blockNumInt)) {
+        res.status(400)
+        res.json({ error: `invalid before param provided, expected a number but got: ${req.query.block_number}` })
+        return
+      }
+    }
+    const rows = await sql`
+        select
+            transaction_hash,
+            block_number,
+            miner_reward,
+            gas_used,
+            gas_price
+        from
+            mined_bundles
+        where
+            (${beforeInt || null}::int is null or block_number < ${beforeInt}) and
+            (${blockNumInt || null}::int is null or block_number = ${blockNumInt})
+        order by
+            block_number desc
+        limit
+          ${limit}`
 
     const blocks = _.map(rows, ({ transaction_hash, block_number, miner_reward, gas_used, gas_price }) => {
       return {
