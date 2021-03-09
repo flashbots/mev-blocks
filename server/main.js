@@ -135,10 +135,10 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
  *
  * @apiSuccess {Object[]} blocks       List of blocks.
- * @apiSuccess {Number}   blocks.block_number   block_number
- * @apiSuccess {Number}   blocks.miner_reward   miner_reward
- * @apiSuccess {Number}   blocks.gas_used   gas_used
- * @apiSuccess {Number}   blocks.gas_price   gas_price
+ * @apiSuccess {Number}   blocks.block_number   Block number
+ * @apiSuccess {Number}   blocks.miner_reward   The total reward paid to the miner. This includes gas fees
+ * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
+ * @apiSuccess {Number}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {String}   blocks.transactions.tx_index index of tx inside of bundle
