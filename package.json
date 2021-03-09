@@ -1,5 +1,5 @@
 {
-  "name": "mev-etherscan",
+  "name": "mev-blocks",
   "version": "1.0.0",
   "main": "server/index.js",
   "author": "Jason Paryani <github@jparyani.com>",
@@ -10,9 +10,9 @@
     "start": "node server/main.js"
   },
   "apidoc": {
-    "title": "Flashbots-Etherscan api",
-    "url": "https://etherscan.flashbots.net",
-    "description": "An API for bridging between Flashbots and Etherscan"
+    "title": "Flashbots Blocks API",
+    "url": "https://blocks.flashbots.net",
+    "description": "An API for displaying flashbots blocks and transactions"
   },
   "dependencies": {
     "@sentry/node": "^6.1.0",
