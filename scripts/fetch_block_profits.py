@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import requests
 import argparse
+import urllib.request
+import json
 
 
 def main():
@@ -12,9 +13,9 @@ def main():
     url = f'https://blocks.flashbots.net/v1/blocks?block_number={args.block_number}'
     print('Fetching:', url)
 
-    resp = requests.get(url)
+    f = urllib.request.urlopen(url)
 
-    block = resp.json()['blocks'][0]
+    block = json.load(f)['blocks'][0]
 
     coinbase_transfers = 0
     for tx in block['transactions']:
