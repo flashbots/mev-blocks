@@ -137,7 +137,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   Block number
  * @apiSuccess {Number}   blocks.miner_reward   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
- * @apiSuccess {Number}   blocks.coinbase_transfers   The total ETH transferred to directly coinbase, not counting gas
+ * @apiSuccess {Number}   blocks.coinbase_transfers   The total ETH transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
  * @apiSuccess {Number}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
  * @apiSuccess {Object[]} blocks.transactions List of transactions
