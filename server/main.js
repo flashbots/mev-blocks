@@ -128,7 +128,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @api {get} /v1/blocks Get blocks
  * @apiVersion 1.0.0
  * @apiGroup Flashbots
- * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use the `before` query param to filter to blocks before a given block number.
+ * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use query parameters to filter this down to blocks you're interested in.
  *
  * @apiParam (Query string) {Number}   [block_number]  Returns just a single block equal to the given block_number
  * @apiParam (Query string) {String}   [miner]  Filter to a single miner address
@@ -137,7 +137,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  *
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   Block number
- * @apiSuccess {String}   blocks.miner   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
+ * @apiSuccess {String}   blocks.miner   The miner's address
  * @apiSuccess {Number}   blocks.miner_reward   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
  * @apiSuccess {Number}   blocks.coinbase_transfers   The total ETH transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
