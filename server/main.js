@@ -33,14 +33,14 @@ const sql = postgres(process.env.POSTGRES_DSN)
  *
  * @apiSuccess {Object[]} transactions       List of transactions.
  * @apiSuccess {String}   transactions.transaction_hash transaction hash
- * @apiSuccess {String}   transactions.tx_index index of tx inside of bundle
+ * @apiSuccess {Number}   transactions.tx_index index of tx inside of bundle
  * @apiSuccess {Number}   transactions.block_number   block number
  * @apiSuccess {String}   transactions.eoa_address address of the externally owned account that created this transaction
  * @apiSuccess {String}   transactions.to_address to address
- * @apiSuccess {String}   transactions.gas_used gas used in this transaction
- * @apiSuccess {String}   transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {Number}   transactions.gas_used gas used in this transaction
+ * @apiSuccess {Number}   transactions.gas_price gas price of this transaction
+ * @apiSuccess {Number}   transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
+ * @apiSuccess {Number}   transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -131,25 +131,27 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use the `before` query param to filter to blocks before a given block number.
  *
  * @apiParam (Query string) {Number}   [block_number]  Returns just a single block equal to the given block_number
+ * @apiParam (Query string) {String}   [miner]  Filter to a single miner address
  * @apiParam (Query string) {Number}   [before=latest]  Filter blocks to before this block number (exclusive, does not include this block number)
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
  *
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   Block number
+ * @apiSuccess {String}   blocks.miner   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
  * @apiSuccess {Number}   blocks.miner_reward   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
  * @apiSuccess {Number}   blocks.coinbase_transfers   The total ETH transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
  * @apiSuccess {Number}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
- * @apiSuccess {String}   blocks.transactions.tx_index index of tx inside of bundle
+ * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
  * @apiSuccess {Number}   blocks.transactions.block_number   block number
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
  * @apiSuccess {String}   blocks.transactions.to_address to address
- * @apiSuccess {String}   blocks.transactions.gas_used gas used in this transaction
- * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {Number}   blocks.transactions.gas_used gas used in this transaction
+ * @apiSuccess {Number}   blocks.transactions.gas_price gas price of this transaction
+ * @apiSuccess {Number}   blocks.transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
+ * @apiSuccess {Number}   blocks.transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -157,6 +159,7 @@ app.get('/v1/transactions', async (req, res, next) => {
     {
       "block_number": 12006597,
       "miner_reward": 89103402731082940,
+      "miner": "0xd224ca0c819e8e97ba0136b3b95ceff503b79f53",
       "coinbase_transfers": 51418761731082940,
       "gas_used": 374858,
       "gas_price": 237699082668,
@@ -188,7 +191,7 @@ app.get('/v1/transactions', async (req, res, next) => {
   ]
 }
  */
-app.get('/v1/blocks/:block_number?', async (req, res) => {
+app.get('/v1/blocks', async (req, res) => {
   /* eslint-disable camelcase */
   try {
     let before = req.query.before
@@ -224,10 +227,17 @@ app.get('/v1/blocks/:block_number?', async (req, res) => {
         return
       }
     }
+
+    let miner = req.query.miner
+    if (miner) {
+      miner = miner.toLowerCase()
+    }
+
     const blocks = await sql`
         select
             b.block_number,
             b.miner_reward,
+            b.miner,
             sum(t.coinbase_transfer) as coinbase_transfers,
             b.gas_used,
             b.gas_price,
@@ -237,25 +247,14 @@ app.get('/v1/blocks/:block_number?', async (req, res) => {
               join mined_bundle_txs t ON b.block_number = t.block_number
         where
             (${beforeInt || null}::int is null or b.block_number < ${beforeInt}) and
-            (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt})
+            (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}) and
+            (${miner || null}::text is null or b.miner = ${miner})
         group by
             b.block_number
         order by
             b.block_number desc
         limit
           ${limit}`
-
-    // const blocks = _.map(rows, ({ transaction_hash, block_number, miner_reward, gas_used, gas_price }) => {
-    //   return {
-    //     transactions: _.map(transaction_hash.split(','), (tx) => {
-    //       return { transaction_hash: tx }
-    //     }),
-    //     block_number,
-    //     miner_reward,
-    //     gas_used,
-    //     gas_price
-    //   }
-    // })
 
     res.json({ blocks })
   } catch (error) {
