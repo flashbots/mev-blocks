@@ -19,7 +19,6 @@ process.on('unhandledRejection', (err) => {
 })
 
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
-
 const sql = postgres(process.env.POSTGRES_DSN)
 
 /**
@@ -38,9 +37,9 @@ const sql = postgres(process.env.POSTGRES_DSN)
  * @apiSuccess {String}   transactions.eoa_address address of the externally owned account that created this transaction
  * @apiSuccess {String}   transactions.to_address to address
  * @apiSuccess {Number}   transactions.gas_used gas used in this transaction
- * @apiSuccess {Number}   transactions.gas_price gas price of this transaction
- * @apiSuccess {Number}   transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
- * @apiSuccess {Number}   transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {String}   transactions.gas_price gas price of this transaction
+ * @apiSuccess {String}   transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
+ * @apiSuccess {String}   transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -103,9 +102,9 @@ app.get('/v1/transactions', async (req, res, next) => {
           eoa_address,
           to_address,
           gas_used,
-          gas_price,
-          coinbase_transfer,
-          total_miner_reward
+          gas_price::text,
+          coinbase_transfer::text,
+          total_miner_reward::text
       from
           mined_bundle_txs
       where
@@ -138,10 +137,10 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   Block number
  * @apiSuccess {String}   blocks.miner   The miner's address
- * @apiSuccess {Number}   blocks.miner_reward   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
- * @apiSuccess {Number}   blocks.coinbase_transfers   The total ETH transferred directly to coinbase, not counting gas
+ * @apiSuccess {String}   blocks.miner_reward   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
+ * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
- * @apiSuccess {Number}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
+ * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
@@ -149,9 +148,9 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
  * @apiSuccess {String}   blocks.transactions.to_address to address
  * @apiSuccess {Number}   blocks.transactions.gas_used gas used in this transaction
- * @apiSuccess {Number}   blocks.transactions.gas_price gas price of this transaction
- * @apiSuccess {Number}   blocks.transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
- * @apiSuccess {Number}   blocks.transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
+ * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
+ * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -236,12 +235,22 @@ app.get('/v1/blocks', async (req, res) => {
     const blocks = await sql`
         select
             b.block_number,
-            b.miner_reward,
+            b.miner_reward::text,
             b.miner,
-            sum(t.coinbase_transfer) as coinbase_transfers,
+            sum(t.coinbase_transfer)::text as coinbase_transfers,
             b.gas_used,
-            b.gas_price,
-            array_agg(row_to_json(t)) as transactions
+            b.gas_price::text,
+            array_agg(json_build_object(
+              'transaction_hash', t.transaction_hash,
+              'tx_index', t.tx_index,
+              'block_number', t.block_number,
+              'eoa_address', t.eoa_address,
+              'to_address', t.to_address,
+              'gas_used', t.gas_used,
+              'gas_price', t.gas_price::text,
+              'coinbase_transfer', t.coinbase_transfer::text,
+              'total_miner_reward', t.total_miner_reward::text
+            )) as transactions
         from
             mined_bundles b
               join mined_bundle_txs t ON b.block_number = t.block_number
