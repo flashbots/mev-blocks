@@ -30,6 +30,7 @@ const sql = postgres(process.env.POSTGRES_DSN)
  * @apiParam (Query string) {Number}   [before=latest]  Filter transactions to before this block number (exclusive, does not include this block number)
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of transactions that are returned
  *
+ * @apiSuccess {Number}   latestBlockNumber   The latest block number that has been processed
  * @apiSuccess {Object[]} transactions       List of transactions.
  * @apiSuccess {String}   transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   transactions.tx_index index of tx inside of bundle
@@ -66,7 +67,8 @@ const sql = postgres(process.env.POSTGRES_DSN)
       "coinbase_transfer": "0",
       "total_miner_reward": "0"
     }
-  ]
+  ],
+  "latestBlockNumber": 11999809
 }
  */
 app.get('/v1/transactions', async (req, res, next) => {
@@ -114,7 +116,9 @@ app.get('/v1/transactions', async (req, res, next) => {
       limit
           ${limit}`
 
-    res.json({ transactions })
+    const latestBlockNumber = await sql`select block_number from block_mined_latest`
+
+    res.json({ transactions, latestBlockNumber: latestBlockNumber[0].block_number })
   } catch (error) {
     console.error('unhandled error in /transactions', error)
     Sentry.captureException(error)
@@ -134,6 +138,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiParam (Query string) {Number}   [before=latest]  Filter blocks to before this block number (exclusive, does not include this block number)
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
  *
+ * @apiSuccess {Number}   latestBlockNumber   The latest block number that has been processed
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   Block number
  * @apiSuccess {String}   blocks.miner   The miner's address
@@ -187,7 +192,8 @@ app.get('/v1/transactions', async (req, res, next) => {
         }
       ]
     }
-  ]
+  ],
+  "latestBlockNumber": 12006599
 }
  */
 app.get('/v1/blocks', async (req, res) => {
@@ -265,7 +271,9 @@ app.get('/v1/blocks', async (req, res) => {
         limit
           ${limit}`
 
-    res.json({ blocks })
+    const latestBlockNumber = await sql`select block_number from block_mined_latest`
+
+    res.json({ blocks, latestBlockNumber: latestBlockNumber[0].block_number })
   } catch (error) {
     console.error('unhandled error in /transactions', error)
     Sentry.captureException(error)
