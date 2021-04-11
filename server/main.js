@@ -285,5 +285,5 @@ app.get('/v1/blocks', async (req, res) => {
 app.use(express.static('apidoc'))
 
 app.listen(PORT, () => {
-  console.log(`mev-etherscan listening at ${PORT}`)
+  console.log(`mev-blocks listening at ${PORT}`)
 })

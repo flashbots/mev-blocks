@@ -1,4 +1,4 @@
-# mev-etherscan
+# mev-blocks
 
 ## Run locally
 
@@ -11,11 +11,11 @@ yarn run start
 ## Build docker container
 
 ```
-docker build -t mev-etherscan .
+docker build -t mev-blocks .
 ```
 
 ## Run docker container
 
 ```
-docker rm -f mev-etherscan; docker run -d --network=host -e 'POSTGRES_DSN=postgres://mev_etherscan@localhost:5432/mev' --init --name mev-etherscan --restart=always mev-etherscan
+docker rm -f mev-blocks; docker run -d --network=host -e 'POSTGRES_DSN=postgres://mev_blocks@localhost:5432/mev' --init --name mev-blocks --restart=always mev-blocks
 ```
