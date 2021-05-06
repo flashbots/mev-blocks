@@ -105,12 +105,12 @@ app.get('/v1/transactions', async (req, res, next) => {
           tx_index,
           bundle_index,
           block_number,
-          eoa_address,
+          from_address as eao_address,
           to_address,
           gas_used,
           gas_price::text,
-          coinbase_transfer::text,
-          total_miner_reward::text
+          eth_sent_to_coinbase::text as coinbase_transfer,
+          coinbase_diff::text as total_miner_reward
       from
           mined_bundle_txs
       where
