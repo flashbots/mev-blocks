@@ -34,6 +34,7 @@ const sql = postgres(process.env.POSTGRES_DSN)
  * @apiSuccess {Object[]} transactions       List of transactions.
  * @apiSuccess {String}   transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   transactions.tx_index index of tx inside of bundle
+ * @apiSuccess {Number}   transactions.bundle_index index of bundle inside of the block
  * @apiSuccess {Number}   transactions.block_number   block number
  * @apiSuccess {String}   transactions.eoa_address address of the externally owned account that created this transaction
  * @apiSuccess {String}   transactions.to_address to address
@@ -48,6 +49,7 @@ const sql = postgres(process.env.POSTGRES_DSN)
     {
       "transaction_hash": "0x52258130e92d9a527e1751aa011a340641c7b0ff61c7df1c35b6eddc8a0cfadd",
       "tx_index": 0,
+      "bundle_index": 0,
       "block_number": 11999806,
       "eoa_address": "0x421125ca608A35458B2C99DA39CD55B70bA202a4",
       "to_address": "0xa57Bd00134B2850B2a1c55860c9e9ea100fDd6CF",
@@ -59,6 +61,7 @@ const sql = postgres(process.env.POSTGRES_DSN)
     {
       "transaction_hash": "0x965aa095d75f03ba91851ce3b8f1b51fee09ae0de837e42652412b6ace18691f",
       "tx_index": 0,
+      "bundle_index": 0,
       "block_number": 11999435,
       "eoa_address": "0x1F00ACFEdC298253487D91758bcfe9D7a6Ba2c83",
       "to_address": "0xb10E56Edb7698C960f1562c7edcC15612900c4A5",
@@ -98,8 +101,9 @@ app.get('/v1/transactions', async (req, res, next) => {
     }
     const transactions = await sql`
       select
-          transaction_hash,
+          tx_hash as transaction_hash,
           tx_index,
+          bundle_index,
           block_number,
           eoa_address,
           to_address,
@@ -116,7 +120,7 @@ app.get('/v1/transactions', async (req, res, next) => {
       limit
           ${limit}`
 
-    const latestBlockNumber = await sql`select block_number from block_mined_latest`
+    const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
 
     res.json({ transactions, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
@@ -149,6 +153,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
+ * @apiSuccess {Number}   blocks.transactions.bundle_index index of bundle inside of the block
  * @apiSuccess {Number}   blocks.transactions.block_number   block number
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
  * @apiSuccess {String}   blocks.transactions.to_address to address
@@ -171,6 +176,7 @@ app.get('/v1/transactions', async (req, res, next) => {
         {
           "transaction_hash": "0x3c302a865edd01047e5454a28feb4bb91b5e4d880b53ba2b91aec359ebe031a5",
           "tx_index": 0,
+          "bundle_index": 0,
           "block_number": 12006597,
           "eoa_address": "0xf888ac7A3f709d3DA4fabBB04412c479b94FEC94",
           "to_address": "0x111111125434b319222CdBf8C261674aDB56F3ae",
@@ -182,6 +188,7 @@ app.get('/v1/transactions', async (req, res, next) => {
         {
           "transaction_hash": "0xb0686a581fde130f5e0621c6aedb2f7b4c33fbc95f89cda0e01833843a4f6b29",
           "tx_index": 1,
+          "bundle_index": 0,
           "block_number": 12006597,
           "eoa_address": "0xD1c1E70325E89bf7d6440Fe9D10802186B21672d",
           "to_address": "0xa57Bd00134B2850B2a1c55860c9e9ea100fDd6CF",
@@ -241,25 +248,26 @@ app.get('/v1/blocks', async (req, res) => {
     const blocks = await sql`
         select
             b.block_number,
-            b.miner_reward::text,
-            b.miner,
-            sum(t.coinbase_transfer)::text as coinbase_transfers,
-            b.gas_used,
-            b.gas_price::text,
+            sum(b.coinbase_diff)::text as miner_reward,
+            min(b.miner) as miner,
+            sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
+            sum(b.gas_used) as gas_used,
+            floor(sum(b.coinbase_diff)/sum(b.gas_used))::text as gas_price,
             array_agg(json_build_object(
-              'transaction_hash', t.transaction_hash,
+              'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,
+              'bundle_index', t.bundle_index,
               'block_number', t.block_number,
-              'eoa_address', t.eoa_address,
+              'eoa_address', t.from_address,
               'to_address', t.to_address,
               'gas_used', t.gas_used,
               'gas_price', t.gas_price::text,
-              'coinbase_transfer', t.coinbase_transfer::text,
-              'total_miner_reward', t.total_miner_reward::text
-            )) as transactions
+              'coinbase_transfer', t.eth_sent_to_coinbase::text,
+              'total_miner_reward', t.coinbase_diff::text
+            ) ORDER BY t.bundle_index, t.tx_index) as transactions
         from
             mined_bundles b
-              join mined_bundle_txs t ON b.block_number = t.block_number
+              join mined_bundle_txs t ON b.bundle_id = t.bundle_id
         where
             (${beforeInt || null}::int is null or b.block_number < ${beforeInt}) and
             (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}) and
@@ -271,7 +279,7 @@ app.get('/v1/blocks', async (req, res) => {
         limit
           ${limit}`
 
-    const latestBlockNumber = await sql`select block_number from block_mined_latest`
+    const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
 
     res.json({ blocks, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
