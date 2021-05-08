@@ -1,6 +1,7 @@
 const express = require('express')
 const Sentry = require('@sentry/node')
 const postgres = require('postgres')
+const cors = require('cors')
 const _ = require('lodash')
 
 if (process.env.SENTRY_DSN) {
@@ -13,6 +14,9 @@ if (process.env.SENTRY_DSN) {
 const app = express()
 app.set('trust proxy', true)
 
+app.use(
+  cors({ origin: ['https://blocs.flashbots.net', 'https://flashbots-explorer.marto.lol', 'https://test--flashbots-explorer.netlify.app'] })
+)
 process.on('unhandledRejection', (err) => {
   Sentry.captureException(err)
   console.error(`unhandled rejection: ${err}`)
