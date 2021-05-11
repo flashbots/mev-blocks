@@ -252,11 +252,11 @@ app.get('/v1/blocks', async (req, res) => {
     const blocks = await sql`
         select
             b.block_number,
-            sum(b.coinbase_diff)::text as miner_reward,
+            sum(t.coinbase_diff)::text as miner_reward,
             min(b.miner) as miner,
             sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
-            sum(b.gas_used) as gas_used,
-            floor(sum(b.coinbase_diff)/sum(b.gas_used))::text as gas_price,
+            sum(t.gas_used) as gas_used,
+            floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as gas_price,
             array_agg(json_build_object(
               'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,
