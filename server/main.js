@@ -2,6 +2,7 @@ const express = require('express')
 const Sentry = require('@sentry/node')
 const postgres = require('postgres')
 const cors = require('cors')
+const utils = require('web3-utils')
 const _ = require('lodash')
 
 if (process.env.SENTRY_DSN) {
@@ -246,7 +247,7 @@ app.get('/v1/blocks', async (req, res) => {
 
     let miner = req.query.miner
     if (miner) {
-      miner = miner.toLowerCase()
+      miner = utils.toChecksumAddress(miner)
     }
 
     const blocks = await sql`
