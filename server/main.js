@@ -144,6 +144,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  *
  * @apiParam (Query string) {Number}   [block_number]  Returns just a single block equal to the given block_number
  * @apiParam (Query string) {String}   [miner]  Filter to a single miner address
+ * @apiParam (Query string) {String}   [from]   Filter to get blocks including transactions sent by from
  * @apiParam (Query string) {Number}   [before=latest]  Filter blocks to before this block number (exclusive, does not include this block number)
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
  *
@@ -250,6 +251,11 @@ app.get('/v1/blocks', async (req, res) => {
       miner = utils.toChecksumAddress(miner)
     }
 
+    let from = req.query.from
+    if (from) {
+      from = utils.toChecksumAddress(from)
+    }
+
     const blocks = await sql`
         select
             b.block_number,
@@ -277,6 +283,8 @@ app.get('/v1/blocks', async (req, res) => {
             (${beforeInt || null}::int is null or b.block_number < ${beforeInt}) and
             (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}) and
             (${miner || null}::text is null or b.miner = ${miner})
+        having
+            (${from || null}::text is null or ${from} = any(array_agg(b.transactions.from)))
         group by
             b.block_number
         order by
