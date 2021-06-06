@@ -282,9 +282,8 @@ app.get('/v1/blocks', async (req, res) => {
         where
             (${beforeInt || null}::int is null or b.block_number < ${beforeInt}) and
             (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}) and
-            (${miner || null}::text is null or b.miner = ${miner})
-        having
-            (${from || null}::text is null or ${from} = any(array_agg(b.transactions.from)))
+            (${miner || null}::text is null or b.miner = ${miner}) and
+            (${from || null}::text is null or b.block_number IN (SELECT block_number from mined_bundle_txs where from_address = ${from}))
         group by
             b.block_number
         order by
