@@ -157,6 +157,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
+ * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots" or "rogue". Rogue bundles are bundles that did not originate from the flashbots relay
  * @apiSuccess {Number}   blocks.transactions.bundle_index index of bundle inside of the block
  * @apiSuccess {Number}   blocks.transactions.block_number   block number
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
@@ -179,6 +180,7 @@ app.get('/v1/transactions', async (req, res, next) => {
       "transactions": [
         {
           "transaction_hash": "0x3c302a865edd01047e5454a28feb4bb91b5e4d880b53ba2b91aec359ebe031a5",
+          "bundle_type": "flashbots",
           "tx_index": 0,
           "bundle_index": 0,
           "block_number": 12006597,
@@ -191,6 +193,7 @@ app.get('/v1/transactions', async (req, res, next) => {
         },
         {
           "transaction_hash": "0xb0686a581fde130f5e0621c6aedb2f7b4c33fbc95f89cda0e01833843a4f6b29",
+          "bundle_type": "flashbots",
           "tx_index": 1,
           "bundle_index": 0,
           "block_number": 12006597,
@@ -265,6 +268,7 @@ app.get('/v1/blocks', async (req, res) => {
             array_agg(json_build_object(
               'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,
+              'bundle_type', b.type,
               'bundle_index', t.bundle_index,
               'block_number', t.block_number,
               'eoa_address', t.from_address,
@@ -283,7 +287,7 @@ app.get('/v1/blocks', async (req, res) => {
             (${miner || null}::text is null or b.miner = ${miner}) and
             (${from || null}::text is null or b.block_number IN (SELECT block_number from mined_bundle_txs where from_address = ${from}))
         group by
-            b.block_number
+            b.block_number, b.type
         order by
             b.block_number desc
         limit
