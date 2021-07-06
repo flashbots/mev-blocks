@@ -276,7 +276,7 @@ app.get('/v1/blocks', async (req, res) => {
             ) ORDER BY t.bundle_index, t.tx_index) as transactions
         from
             mined_bundles b
-              join mined_bundle_txs t ON b.bundle_id = t.bundle_id
+              join mined_bundle_txs t ON b.block_number = t.block_number AND b.bundle_index = t.bundle_index
         where
             (${beforeInt || null}::int is null or b.block_number < ${beforeInt}) and
             (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}) and
