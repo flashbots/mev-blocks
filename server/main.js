@@ -268,7 +268,7 @@ app.get('/v1/blocks', async (req, res) => {
             array_agg(json_build_object(
               'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,
-              'bundle_type', b.type,
+              'bundle_type', t.bundle_type,
               'bundle_index', t.bundle_index,
               'block_number', t.block_number,
               'eoa_address', t.from_address,
@@ -287,7 +287,7 @@ app.get('/v1/blocks', async (req, res) => {
             (${miner || null}::text is null or b.miner = ${miner}) and
             (${from || null}::text is null or b.block_number IN (SELECT block_number from mined_bundle_txs where from_address = ${from}))
         group by
-            b.block_number, b.type
+            b.block_number
         order by
             b.block_number desc
         limit
