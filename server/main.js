@@ -3,6 +3,7 @@ const Sentry = require('@sentry/node')
 const postgres = require('postgres')
 const cors = require('cors')
 const utils = require('web3-utils')
+const morgan = require('morgan')
 const _ = require('lodash')
 
 if (process.env.SENTRY_DSN) {
@@ -15,6 +16,7 @@ if (process.env.SENTRY_DSN) {
 const app = express()
 app.set('trust proxy', true)
 
+app.use(morgan('combined'))
 app.use(cors({ origin: ['http://localhost:3000', 'https://flashbots-explorer.marto.lol', 'https://test--flashbots-explorer.netlify.app'] }))
 process.on('unhandledRejection', (err) => {
   Sentry.captureException(err)
