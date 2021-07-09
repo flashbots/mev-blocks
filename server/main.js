@@ -21,7 +21,7 @@ app.use(morgan('combined'))
 app.use(
   rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 10
+    max: 60
   })
 )
 app.use(cors({ origin: ['http://localhost:3000', 'https://flashbots-explorer.marto.lol', 'https://test--flashbots-explorer.netlify.app'] }))
