@@ -65,7 +65,7 @@ async function main() {
     }
     before = blocks[blocks.length - 1].block_number
     let blocksJSON = JSON.stringify(blocks)
-    blocksJSON = blocksJSON.slice(1, blocksJSON.length - 3)
+    blocksJSON = blocksJSON.slice(1, blocksJSON.length - 1)
     if (!first) {
       blocksJSON = ',' + blocksJSON
     } else {
