@@ -17,7 +17,7 @@ if (process.env.SENTRY_DSN) {
 const app = express()
 app.set('trust proxy', true)
 
-app.use(morgan('combined'))
+app.use(morgan('short'))
 app.use(
   rateLimit({
     windowMs: 60 * 1000, // 1 minute
@@ -232,7 +232,7 @@ app.get('/v1/blocks', async (req, res) => {
     }
     if (limit < 0 || limit > 10000) {
       res.status(400)
-      res.json({ error: `invalid limit param provided, must be less than 10000 and more than 0: ${req.query.limit}` })
+      res.json({ error: `invalid limit param provided, must be less than 10000 and more than 0 but got: ${req.query.limit}` })
       return
     }
 
@@ -251,7 +251,7 @@ app.get('/v1/blocks', async (req, res) => {
       blockNumInt = parseInt(req.query.block_number)
       if (isNaN(blockNumInt)) {
         res.status(400)
-        res.json({ error: `invalid before param provided, expected a number but got: ${req.query.block_number}` })
+        res.json({ error: `invalid block_number param provided, expected a number but got: ${req.query.block_number}` })
         return
       }
     }
@@ -311,6 +311,16 @@ app.get('/v1/blocks', async (req, res) => {
     res.status(500)
     res.end('Internal Server Error')
   }
+})
+
+/**
+ * @api {get} /v1/all_blocks Historical json dump of all blocks
+ * @apiVersion 1.0.0
+ * @apiGroup Flashbots
+ * @apiDescription Returns all flashbots blocks, see /v1/blocks for api documentation
+ */
+app.get('/v1/all_blocks', async (_, res) => {
+  res.redirect('https://blocks-api.s3.us-east-2.amazonaws.com/latest_blocks.json')
 })
 
 app.use(express.static('apidoc'))
