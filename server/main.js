@@ -33,6 +33,12 @@ process.on('unhandledRejection', (err) => {
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const sql = postgres(process.env.POSTGRES_DSN)
 
+function isMegabundleBlock(mergedBlock, megabundleBlock) {
+  if (mergedBlock === undefined) return true
+  if (megabundleBlock === undefined) return false
+  return megabundleBlock.transactions > mergedBlock.transactions
+}
+
 /**
  * @api {get} /v1/transactions Get transactions
  * @apiVersion 1.0.0
@@ -266,7 +272,7 @@ app.get('/v1/blocks', async (req, res) => {
       from = utils.toChecksumAddress(from)
     }
 
-    const blocks = await sql`
+    const mergedBundles = await sql`
         select
             b.block_number,
             sum(t.coinbase_diff)::text as miner_reward,
@@ -302,9 +308,64 @@ app.get('/v1/blocks', async (req, res) => {
         limit
           ${limit}`
 
+    const megabundles = await sql`
+        select
+            mmb.block_number,
+            sum(t.coinbase_diff)::text as miner_reward,
+            min(blocks.miner) as miner,
+            sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
+            sum(t.gas_used) as gas_used,
+            floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as gas_price,
+            array_agg(json_build_object(
+              'transaction_hash', t.tx_hash,
+              'tx_index', t.tx_index,
+              'bundle_index', t.bundle_index,
+              'block_number', mmb.block_number,
+              'eoa_address', t.from_address,
+              'to_address', t.to_address,
+              'gas_used', t.gas_used,
+              'gas_price', t.gas_price::text,
+              'coinbase_transfer', t.eth_sent_to_coinbase::text,
+              'total_miner_reward', t.coinbase_diff::text
+            ) ORDER BY t.bundle_index, t.tx_index) as transactions
+        from
+            mined_megabundle_bundles b
+              join mined_megabundles mmb ON b.megabundle_id = mmb.megabundle_id
+              join mined_megabundle_bundle_txs t ON t.megabundle_id = mmb.megabundle_id
+              join blocks ON blocks.block_number = mmb.block_number
+        where
+            (${beforeInt || null}::int is null or mmb.block_number < ${beforeInt}) and
+            (${blockNumInt || null}::int is null or mmb.block_number = ${blockNumInt}) and
+            (${miner || null}::text is null or blocks.miner = ${miner}) and
+            (${
+              from || null
+            }::text is null or mmb.block_number IN (SELECT mined_megabundles.block_number from mined_megabundle_bundle_txs JOIN mined_megabundles ON mined_megabundles.megabundle_id = mined_megabundle_bundle_txs.megabundle_id where from_address = ${from}))
+        group by
+            mmb.block_number
+        order by
+            mmb.block_number desc
+        limit
+          ${limit}`
+
+    // Each result set is sparse, find all unique block numbers in both bundle types, rebuild array sequentially
+    const blockNumbers = _.chain([...mergedBundles, ...megabundles])
+      .map('block_number')
+      .uniq()
+      .sort()
+      .value()
+
+    const mergedByBlockNumber = _.keyBy(mergedBundles, 'block_number')
+    const megabundleByBlockNumber = _.keyBy(megabundles, 'block_number')
+    const inferredBundleBlocks = _.map(blockNumbers, (blockNumber) => {
+      const isMegabundle = isMegabundleBlock(mergedByBlockNumber[blockNumber], megabundleByBlockNumber[blockNumber])
+      return {
+        ...(isMegabundle ? megabundleByBlockNumber[blockNumber] : mergedByBlockNumber[blockNumber]),
+        isMegabundle: isMegabundle
+      }
+    })
     const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
 
-    res.json({ blocks, latest_block_number: latestBlockNumber[0].block_number })
+    res.json({ blocks: inferredBundleBlocks, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
     console.error('unhandled error in /transactions', error)
     Sentry.captureException(error)
