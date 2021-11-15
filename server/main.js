@@ -360,7 +360,7 @@ app.get('/v1/blocks', async (req, res) => {
       const isMegabundle = isMegabundleBlock(mergedByBlockNumber[blockNumber], megabundleByBlockNumber[blockNumber])
       return {
         ...(isMegabundle ? megabundleByBlockNumber[blockNumber] : mergedByBlockNumber[blockNumber]),
-        isMegabundle: isMegabundle
+        isMegabundle
       }
     })
     const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
