@@ -58,8 +58,8 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
  * @apiSuccess {String}   transactions.to_address to address
  * @apiSuccess {Number}   transactions.gas_used gas used in this transaction
  * @apiSuccess {String}   transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {String}   transactions.coinbase_transfer ETH (in wei) directly transferred to the coinbase, not counting gas
+ * @apiSuccess {String}   transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -165,8 +165,8 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   Block number
  * @apiSuccess {String}   blocks.miner   The miner's address
- * @apiSuccess {String}   blocks.miner_reward   The total ETH reward paid to the miner. This includes gas fees and coinbase transfers
- * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH transferred directly to coinbase, not counting gas
+ * @apiSuccess {String}   blocks.miner_reward   The total ETH (in wei) reward paid to the miner. This includes gas fees and coinbase transfers
+ * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH (in wei) transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
  * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
  * @apiSuccess {Object[]} blocks.transactions List of transactions
@@ -179,8 +179,8 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {String}   blocks.transactions.to_address to address
  * @apiSuccess {Number}   blocks.transactions.gas_used gas used in this transaction
  * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH (in wei)  directly transferred to the coinbase, not counting gas
+ * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
