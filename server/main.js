@@ -354,6 +354,7 @@ app.get('/v1/blocks', async (req, res) => {
       .map('block_number')
       .uniq()
       .sort()
+      .takeRight(limit)
       .value()
 
     const mergedByBlockNumber = _.keyBy(mergedBundles, 'block_number')
