@@ -169,6 +169,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH (in wei) transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
  * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
+ * @apiSuccess {Number}   blocks.is_megabundle   Bool specifying if this block had a megabundle
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
@@ -192,6 +193,7 @@ app.get('/v1/transactions', async (req, res, next) => {
       "coinbase_transfers": "51418761731082940",
       "gas_used": 374858,
       "gas_price": "237699082668",
+      "is_megabundle": false,
       "transactions": [
         {
           "transaction_hash": "0x3c302a865edd01047e5454a28feb4bb91b5e4d880b53ba2b91aec359ebe031a5",
@@ -360,7 +362,7 @@ app.get('/v1/blocks', async (req, res) => {
       const isMegabundle = isMegabundleBlock(mergedByBlockNumber[blockNumber], megabundleByBlockNumber[blockNumber])
       return {
         ...(isMegabundle ? megabundleByBlockNumber[blockNumber] : mergedByBlockNumber[blockNumber]),
-        isMegabundle
+        is_megabundle: isMegabundle
       }
     })
     const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
