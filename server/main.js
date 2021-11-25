@@ -36,7 +36,7 @@ const sql = postgres(process.env.POSTGRES_DSN)
 function isMegabundleBlock(mergedBlock, megabundleBlock) {
   if (mergedBlock === undefined) return true
   if (megabundleBlock === undefined) return false
-  return megabundleBlock.transactions > mergedBlock.transactions
+  return megabundleBlock.transactions.length > mergedBlock.transactions.length
 }
 
 /**
