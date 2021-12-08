@@ -163,11 +163,10 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH (in wei) transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
  * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
- * @apiSuccess {Number}   blocks.is_megabundle   Bool specifying if this block had a megabundle
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
- * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots" or "rogue". Rogue bundles are bundles that did not originate from the flashbots relay
+ * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots", "megabundle", or "rogue". Rogue bundles are bundles that did not originate from the flashbots relay
  * @apiSuccess {Number}   blocks.transactions.bundle_index index of bundle inside of the block
  * @apiSuccess {Number}   blocks.transactions.block_number   block number
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
