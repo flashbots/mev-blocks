@@ -33,12 +33,6 @@ process.on('unhandledRejection', (err) => {
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const sql = postgres(process.env.POSTGRES_DSN)
 
-function isMegabundleBlock(mergedBlock, megabundleBlock) {
-  if (mergedBlock === undefined) return true
-  if (megabundleBlock === undefined) return false
-  return megabundleBlock.transactions.length > mergedBlock.transactions.length
-}
-
 /**
  * @api {get} /v1/transactions Get transactions
  * @apiVersion 1.0.0
@@ -360,10 +354,25 @@ app.get('/v1/blocks', async (req, res) => {
     const mergedByBlockNumber = _.keyBy(mergedBundles, 'block_number')
     const megabundleByBlockNumber = _.keyBy(megabundles, 'block_number')
     const inferredBundleBlocks = _.map(blockNumbers, (blockNumber) => {
-      const isMegabundle = isMegabundleBlock(mergedByBlockNumber[blockNumber], megabundleByBlockNumber[blockNumber])
+      const megaBundleBlock = megabundleByBlockNumber[blockNumber]
+      const mergedBlock = mergedByBlockNumber[blockNumber]
+      if (megaBundleBlock === undefined) return mergedBlock
+      if (mergedBlock === undefined || megaBundleBlock.transactions.length > mergedBlock.transactions.length) return megaBundleBlock
+      const megaBundleTransactions = megaBundleBlock.transactions
+      const mergedTransactions = mergedBlock.transactions
+      const megaBundleIdentifiedTransactions = _.map(mergedTransactions, (mergedTransaction, i) => {
+        const megaBundleTx = megaBundleTransactions[i]
+        if (megaBundleTx === undefined) return mergedTransaction
+        const bundle_type =
+          megaBundleTx.transaction_hash !== mergedTransaction.transaction_hash ? mergedTransaction.bundle_type : 'megabundle'
+        return {
+          ...mergedTransaction,
+          bundle_type
+        }
+      })
       return {
-        ...(isMegabundle ? megabundleByBlockNumber[blockNumber] : mergedByBlockNumber[blockNumber]),
-        is_megabundle: isMegabundle
+        ...mergedBlock,
+        transactions: megaBundleIdentifiedTransactions
       }
     })
     const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
