@@ -364,7 +364,7 @@ app.get('/v1/blocks', async (req, res) => {
         const megaBundleTx = megaBundleTransactions[i]
         if (megaBundleTx === undefined) return mergedTransaction
         const bundle_type =
-          megaBundleTx.transaction_hash !== mergedTransaction.transaction_hash ? mergedTransaction.bundle_type : 'megabundle'
+          megaBundleTx.transaction_hash === mergedTransaction.transaction_hash ? 'megabundle' : mergedTransaction.bundle_type
         return {
           ...mergedTransaction,
           bundle_type
