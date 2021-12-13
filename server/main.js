@@ -33,6 +33,12 @@ process.on('unhandledRejection', (err) => {
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const sql = postgres(process.env.POSTGRES_DSN)
 
+function isMegabundleBlock(mergedBlock, megabundleBlock) {
+  if (mergedBlock === undefined) return true
+  if (megabundleBlock === undefined) return false
+  return megabundleBlock.transactions.length > mergedBlock.transactions.length
+}
+
 /**
  * @api {get} /v1/transactions Get transactions
  * @apiVersion 1.0.0
@@ -143,6 +149,41 @@ app.get('/v1/transactions', async (req, res, next) => {
   }
 })
 
+function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
+  if (megaBundleBlock === undefined) return mergedBlock
+  if (mergedBlock === undefined || megaBundleBlock.transactions.length > mergedBlock.transactions.length) {
+    return {
+      ...megaBundleBlock,
+      transactions: megaBundleBlock.transactions.map((tx) => {
+        return {
+          ...tx,
+          is_megabundle: true
+        }
+      })
+    }
+  }
+
+  // Even though we individually tag transactions as "is_megabundle", we still need to report on overall block metrics, so we need to select an overall block to return and parse transactions for.
+  const baseBlock = isMegabundleBlock(mergedBlock, megaBundleBlock) ? megaBundleBlock : mergedBlock
+  const megaBundleTransactions = megaBundleBlock.transactions
+  const mergedTransactions = mergedBlock.transactions
+  const megaBundleIdentifiedTransactions = _.map(baseBlock.transactions, (transaction, i) => {
+    const megaBundleTx = megaBundleTransactions[i]
+    const mergedTx = mergedTransactions[i]
+    if ((megaBundleTx === undefined && mergedTx !== undefined) || megaBundleTx.transaction_hash !== mergedTx.transaction_hash) {
+      return transaction
+    }
+    return {
+      ...transaction,
+      is_megabundle: true
+    }
+  })
+  return {
+    ...baseBlock,
+    transactions: megaBundleIdentifiedTransactions
+  }
+}
+
 /**
  * @api {get} /v1/blocks Get blocks
  * @apiVersion 1.0.0
@@ -166,7 +207,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
- * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots", "megabundle", or "rogue". Rogue bundles are bundles that did not originate from the flashbots relay
+ * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots", or "rogue". Rogue bundles are bundles that did not originate from the flashbots relay
  * @apiSuccess {Number}   blocks.transactions.bundle_index index of bundle inside of the block
  * @apiSuccess {Number}   blocks.transactions.block_number   block number
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
@@ -175,6 +216,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
  * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH (in wei)  directly transferred to the coinbase, not counting gas
  * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {Boolean}  [blocks.transactions.is_megabundle] True if this transaction was submitted as part of a megabundle
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -186,7 +228,6 @@ app.get('/v1/transactions', async (req, res, next) => {
       "coinbase_transfers": "51418761731082940",
       "gas_used": 374858,
       "gas_price": "237699082668",
-      "is_megabundle": false,
       "transactions": [
         {
           "transaction_hash": "0x3c302a865edd01047e5454a28feb4bb91b5e4d880b53ba2b91aec359ebe031a5",
@@ -199,6 +240,7 @@ app.get('/v1/transactions', async (req, res, next) => {
           "gas_used": 292129,
           "gas_price": "129000000000",
           "coinbase_transfer": "0",
+          "is_megabundle": true,
           "total_miner_reward": "37684641000000000"
         },
         {
@@ -211,6 +253,7 @@ app.get('/v1/transactions', async (req, res, next) => {
           "to_address": "0xa57Bd00134B2850B2a1c55860c9e9ea100fDd6CF",
           "gas_used": 82729,
           "gas_price": "0",
+          "is_megabundle": true,
           "coinbase_transfer": "51418761731082940",
           "total_miner_reward": "51418761731082940"
         }
@@ -355,26 +398,10 @@ app.get('/v1/blocks', async (req, res) => {
     const inferredBundleBlocks = _.map(blockNumbers, (blockNumber) => {
       const megaBundleBlock = megabundleByBlockNumber[blockNumber]
       const mergedBlock = mergedByBlockNumber[blockNumber]
-      if (megaBundleBlock === undefined) return mergedBlock
-      if (mergedBlock === undefined || megaBundleBlock.transactions.length > mergedBlock.transactions.length) return megaBundleBlock
-      const megaBundleTransactions = megaBundleBlock.transactions
-      const mergedTransactions = mergedBlock.transactions
-      const megaBundleIdentifiedTransactions = _.map(mergedTransactions, (mergedTransaction, i) => {
-        const megaBundleTx = megaBundleTransactions[i]
-        if (megaBundleTx === undefined) return mergedTransaction
-        const bundle_type =
-          megaBundleTx.transaction_hash === mergedTransaction.transaction_hash ? 'megabundle' : mergedTransaction.bundle_type
-        return {
-          ...mergedTransaction,
-          bundle_type
-        }
-      })
-      return {
-        ...mergedBlock,
-        transactions: megaBundleIdentifiedTransactions
-      }
+      return inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock)
     })
-    const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
+    const latestBlockNumber = await sql`select max(block_number) as block_number
+                                        from blocks`
 
     res.json({ blocks: inferredBundleBlocks, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
