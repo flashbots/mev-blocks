@@ -33,6 +33,12 @@ process.on('unhandledRejection', (err) => {
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const sql = postgres(process.env.POSTGRES_DSN)
 
+function isMegabundleBlock(mergedBlock, megabundleBlock) {
+  if (mergedBlock === undefined) return true
+  if (megabundleBlock === undefined) return false
+  return megabundleBlock.transactions.length > mergedBlock.transactions.length
+}
+
 /**
  * @api {get} /v1/transactions Get transactions
  * @apiVersion 1.0.0
@@ -143,6 +149,41 @@ app.get('/v1/transactions', async (req, res, next) => {
   }
 })
 
+function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
+  if (megaBundleBlock === undefined) return mergedBlock
+  if (mergedBlock === undefined || megaBundleBlock.transactions.length > mergedBlock.transactions.length) {
+    return {
+      ...megaBundleBlock,
+      transactions: megaBundleBlock.transactions.map((tx) => {
+        return {
+          ...tx,
+          is_megabundle: true
+        }
+      })
+    }
+  }
+
+  // Even though we individually tag transactions as "is_megabundle", we still need to report on overall block metrics, so we need to select an overall block to return and parse transactions for.
+  const baseBlock = isMegabundleBlock(mergedBlock, megaBundleBlock) ? megaBundleBlock : mergedBlock
+  const megaBundleTransactions = megaBundleBlock.transactions
+  const mergedTransactions = mergedBlock.transactions
+  const megaBundleIdentifiedTransactions = _.map(baseBlock.transactions, (transaction, i) => {
+    const megaBundleTx = megaBundleTransactions[i]
+    const mergedTx = mergedTransactions[i]
+    if ((megaBundleTx === undefined && mergedTx !== undefined) || megaBundleTx.transaction_hash !== mergedTx.transaction_hash) {
+      return transaction
+    }
+    return {
+      ...transaction,
+      is_megabundle: true
+    }
+  })
+  return {
+    ...baseBlock,
+    transactions: megaBundleIdentifiedTransactions
+  }
+}
+
 /**
  * @api {get} /v1/blocks Get blocks
  * @apiVersion 1.0.0
@@ -175,7 +216,7 @@ app.get('/v1/transactions', async (req, res, next) => {
  * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
  * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH (in wei)  directly transferred to the coinbase, not counting gas
  * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers
- * @apiSuccess {Boolean}  blocks.transactions.is_megabundle True if this transaction was submitted as part of a megabundle (False implies miner-side merging of bundle)
+ * @apiSuccess {Boolean}  [blocks.transactions.is_megabundle] True if this transaction was submitted as part of a megabundle
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -357,24 +398,10 @@ app.get('/v1/blocks', async (req, res) => {
     const inferredBundleBlocks = _.map(blockNumbers, (blockNumber) => {
       const megaBundleBlock = megabundleByBlockNumber[blockNumber]
       const mergedBlock = mergedByBlockNumber[blockNumber]
-      if (megaBundleBlock === undefined) return mergedBlock
-      if (mergedBlock === undefined || megaBundleBlock.transactions.length > mergedBlock.transactions.length) return megaBundleBlock
-      const megaBundleTransactions = megaBundleBlock.transactions
-      const mergedTransactions = mergedBlock.transactions
-      const megaBundleIdentifiedTransactions = _.map(mergedTransactions, (mergedTransaction, i) => {
-        const megaBundleTx = megaBundleTransactions[i]
-        if (megaBundleTx === undefined) return mergedTransaction
-        return {
-          ...mergedTransaction,
-          is_megabundle: megaBundleTx.transaction_hash === mergedTransaction.transaction_hash
-        }
-      })
-      return {
-        ...mergedBlock,
-        transactions: megaBundleIdentifiedTransactions
-      }
+      return inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock)
     })
-    const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
+    const latestBlockNumber = await sql`select max(block_number) as block_number
+                                        from blocks`
 
     res.json({ blocks: inferredBundleBlocks, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
