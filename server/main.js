@@ -240,7 +240,7 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
           "gas_used": 292129,
           "gas_price": "129000000000",
           "coinbase_transfer": "0",
-          "is_megabundle": false,
+          "is_megabundle": true,
           "total_miner_reward": "37684641000000000"
         },
         {
@@ -253,7 +253,7 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
           "to_address": "0xa57Bd00134B2850B2a1c55860c9e9ea100fDd6CF",
           "gas_used": 82729,
           "gas_price": "0",
-          "is_megabundle": false,
+          "is_megabundle": true,
           "coinbase_transfer": "51418761731082940",
           "total_miner_reward": "51418761731082940"
         }
