@@ -207,7 +207,7 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
- * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots", or "rogue". Rogue bundles are bundles that did not originate from the flashbots relay
+ * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots", "rogue", or "miner_payout". Rogue bundles are bundles that did not originate from the flashbots relay. "miner_payout" identifies transactions from a the block's current coinbase at the head of a block
  * @apiSuccess {Number}   blocks.transactions.bundle_index index of bundle inside of the block
  * @apiSuccess {Number}   blocks.transactions.block_number   block number
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
