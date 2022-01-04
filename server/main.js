@@ -372,8 +372,8 @@ app.get('/v1/blocks', async (req, res) => {
               join mined_megabundle_bundle_txs t ON t.megabundle_id = mmb.megabundle_id
               join blocks ON blocks.block_number = mmb.block_number
         where
-            (${beforeInt || null}::int is null or mmb.block_number < ${beforeInt}) and
-            (${blockNumInt || null}::int is null or mmb.block_number = ${blockNumInt}) and
+            (${beforeInt || null}::bigint is null or mmb.block_number < ${beforeInt}::bigint) and
+            (${blockNumInt || null}::bigint is null or mmb.block_number = ${blockNumInt}::bigint) and
             (${miner || null}::text is null or blocks.miner = ${miner}) and
             (${
               from || null
