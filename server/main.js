@@ -132,7 +132,7 @@ app.get('/v1/transactions', async (req, res, next) => {
       from
           mined_bundle_txs
       where
-          (${beforeInt || null}::int is null or block_number < ${beforeInt})
+          (${beforeInt || null}::int is null or block_number < ${beforeInt}::int)
       order by
           block_number desc
       limit
@@ -335,8 +335,8 @@ app.get('/v1/blocks', async (req, res) => {
             mined_bundles b
               join mined_bundle_txs t ON b.block_number = t.block_number AND b.bundle_index = t.bundle_index
         where
-            (${beforeInt || null}::int is null or b.block_number < ${beforeInt}) and
-            (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}) and
+            (${beforeInt || null}::int is null or b.block_number < ${beforeInt}::int) and
+            (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}::int) and
             (${miner || null}::text is null or b.miner = ${miner}) and
             (${from || null}::text is null or b.block_number IN (SELECT block_number from mined_bundle_txs where from_address = ${from}))
         group by
