@@ -416,10 +416,15 @@ app.get('/v1/blocks', async (req, res) => {
  * @api {get} /v1/all_blocks Historical json dump of all blocks
  * @apiVersion 1.0.0
  * @apiGroup Flashbots
- * @apiDescription Returns all flashbots blocks, see /v1/blocks for api documentation
+ * @apiDescription Returns all flashbots blocks, see /v1/blocks for api documentation. This endpoint is a redirect to an s3 bucket, so keep that in mind. For example, add `-L` to curl, e.g. `curl -L ...`. This
+ * @apiParam (Query string) {Boolean}   [xz]  Return in xz format
  */
-app.get('/v1/all_blocks', async (_, res) => {
-  res.redirect('https://blocks-api.s3.us-east-2.amazonaws.com/latest_blocks.json')
+app.get('/v1/all_blocks', async (req, res) => {
+  if (req.query && req.query.xz) {
+    res.redirect('https://blocks-api.s3.us-east-2.amazonaws.com/latest_blocks.json.xz')
+  } else {
+    res.redirect('https://blocks-api.s3.us-east-2.amazonaws.com/latest_blocks.json')
+  }
 })
 
 app.use(express.static('apidoc'))

@@ -9,7 +9,9 @@ const MAX_BLOCK_NUMBER = 2 ** 63 - 1
 const LIMIT = 10000
 
 const FILENAME = '/tmp/blocks.json'
+const FILENAME_XZ = '/tmp/blocks.json.xz'
 const S3_FILENAME = 's3://blocks-api/latest_blocks.json'
+const S3_FILENAME_XZ = 's3://blocks-api/latest_blocks.json.xz'
 
 async function fetchBlocks(sql, before, limit = LIMIT) {
   return await sql`
@@ -81,6 +83,10 @@ async function main() {
 
   const { stdout, stderr } = await exec(`aws s3 cp --acl public-read ${FILENAME} ${S3_FILENAME}`)
   console.log('aws s3 cp: ', stdout, stderr)
+  const { stdoutxz, stderrxz } = await exec(`xz  ${FILENAME}`)
+  console.log('xz compress: ', stdoutxz, stderrxz)
+  const { stdoutxzs3, stderrxzs3 } = await exec(`aws s3 cp --acl public-read ${FILENAME_XZ} ${S3_FILENAME_XZ}`)
+  console.log('aws s3 cp xz: ', stdoutxzs3, stderrxzs3)
 }
 
 main()
@@ -89,6 +95,11 @@ main()
     process.exit(1)
   })
   .finally(() => {
-    fs.truncateSync(FILENAME, 0)
+    try {
+      fs.truncateSync(FILENAME_XZ, 0)
+    } catch {}
+    try {
+      fs.truncateSync(FILENAME, 0)
+    } catch {}
     process.exit(0)
   })
