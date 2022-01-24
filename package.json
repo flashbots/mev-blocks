@@ -7,6 +7,7 @@
   "scripts": {
     "lint": "eslint .",
     "gen-docs": "apidoc -i server/ -o apidoc/",
+    "dump-s3": "node scripts/dump_to_s3.js",
     "start": "node server/main.js"
   },
   "apidoc": {
