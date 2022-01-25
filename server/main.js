@@ -203,7 +203,7 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
  * @apiSuccess {String}   blocks.miner_reward   The total ETH (in wei) reward paid to the miner. This includes gas fees and coinbase transfers
  * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH (in wei) transferred directly to coinbase, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
- * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not an actual gas price, but it is what's used by mev-geth to sort bundles. Found by doing: miner_reward/gas_used
+ * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not a transactions's gas price, but what mev-geth uses to sort bundles. Found by doing: total_miner_reward/gas_used. Like total_miner_reward, base_fee is subtracted from the gas fees.
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
@@ -214,8 +214,8 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
  * @apiSuccess {String}   blocks.transactions.to_address to address
  * @apiSuccess {Number}   blocks.transactions.gas_used gas used in this transaction
  * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH (in wei)  directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH (in wei) directly transferred to the coinbase, not counting gas
+ * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers. The burned base_fee (EIP-1559) is not credited to the miner, so the base_fee is not present in this value.
  * @apiSuccess {Boolean}  [blocks.transactions.is_megabundle] True if this transaction was submitted as part of a megabundle
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
