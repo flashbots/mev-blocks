@@ -118,24 +118,27 @@ app.get('/v1/transactions', async (req, res, next) => {
       }
     }
     const transactions = await sql`
-      select
-          tx_hash as transaction_hash,
-          tx_index,
-          bundle_index,
-          block_number,
-          from_address as eao_address,
-          to_address,
-          gas_used,
-          gas_price::text,
-          eth_sent_to_coinbase::text as coinbase_transfer,
-          coinbase_diff::text as total_miner_reward
-      from
-          mined_bundle_txs
-      where
+      SELECT
+          mbt.tx_hash as transaction_hash,
+          mbt.tx_index,
+          mbt.bundle_index,
+          mbt.block_number,
+          mbt.from_address as eoa_address,
+          mbt.to_address,
+          mbt.gas_used,
+          mbt.gas_price::text,
+          mbt.eth_sent_to_coinbase::text as coinbase_transfer,
+          mbt.coinbase_diff::text as total_miner_reward,
+          b.received_timestamp as received_at,
+          b.submitted_timestamp as sent_to_miners_at
+      FROM
+          mined_bundle_txs mbt
+              JOIN bundles b ON mbt.bundle_id = b.id
+      WHERE
           (${beforeInt || null}::int is null or block_number < ${beforeInt}::int)
-      order by
+      ORDER BY
           block_number desc
-      limit
+      LIMIT
           ${limit}`
 
     const latestBlockNumber = await sql`select max(block_number) as block_number from blocks`
