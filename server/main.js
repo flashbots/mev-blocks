@@ -137,7 +137,7 @@ app.get('/v1/transactions', async (req, res, next) => {
       WHERE
           (${beforeInt || null}::int is null or block_number < ${beforeInt}::int)
       ORDER BY
-          block_number desc
+          t.block_number desc
       LIMIT
           ${limit}`
 
@@ -316,6 +316,7 @@ app.get('/v1/blocks', async (req, res) => {
     const mergedBundles = await sql`
         SELECT
             mb.block_number,
+            min(bb.inserted_at) as witnessed_at,
             sum(t.coinbase_diff)::text as miner_reward,
             min(mb.miner) as miner,
             sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
@@ -340,6 +341,7 @@ app.get('/v1/blocks', async (req, res) => {
             mined_bundles mb
               JOIN mined_bundle_txs t ON mb.block_number = t.block_number AND mb.bundle_index = t.bundle_index
               JOIN bundles b ON t.bundle_id = b.id
+              JOIN bundles bb ON bb.state_block_number = mb.block_number
         WHERE
             (${beforeInt || null}::int is null or mb.block_number < ${beforeInt}::int) and
             (${blockNumInt || null}::int is null or mb.block_number = ${blockNumInt}::int) and
@@ -355,6 +357,7 @@ app.get('/v1/blocks', async (req, res) => {
     const megabundles = await sql`
         SELECT
             mmb.block_number,
+            min(bb.inserted_at) as witnessed_at,
             sum(t.coinbase_diff)::text as miner_reward,
             min(blocks.miner) as miner,
             sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
@@ -379,7 +382,8 @@ app.get('/v1/blocks', async (req, res) => {
               JOIN mined_megabundles mmb ON mmbb.megabundle_id = mmb.megabundle_id
               JOIN mined_megabundle_bundle_txs t ON t.megabundle_id = mmb.megabundle_id
               JOIN blocks ON blocks.block_number = mmb.block_number
-              JOIN bundles b ON t.bundle_id = b.id
+              JOIN bundles b ON b.id = t.bundle_id
+              JOIN bundles bb ON bb.state_block_number = mmb.block_number
         WHERE
             (${beforeInt || null}::bigint is null or mmb.block_number < ${beforeInt}::bigint) and
             (${blockNumInt || null}::bigint is null or mmb.block_number = ${blockNumInt}::bigint) and
