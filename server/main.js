@@ -48,18 +48,20 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
  * @apiParam (Query string) {Number}   [before=latest]  Filter transactions to before this block number (exclusive, does not include this block number)
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of transactions that are returned
  *
- * @apiSuccess {Number}   latest_block_number   The latest block number that has been processed
- * @apiSuccess {Object[]} transactions       List of transactions.
- * @apiSuccess {String}   transactions.transaction_hash transaction hash
- * @apiSuccess {Number}   transactions.tx_index index of tx inside of bundle
- * @apiSuccess {Number}   transactions.bundle_index index of bundle inside of the block
- * @apiSuccess {Number}   transactions.block_number   block number
- * @apiSuccess {String}   transactions.eoa_address address of the externally owned account that created this transaction
- * @apiSuccess {String}   transactions.to_address to address
- * @apiSuccess {Number}   transactions.gas_used gas used in this transaction
- * @apiSuccess {String}   transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   transactions.coinbase_transfer ETH (in wei) directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {Number}   latest_block_number               The latest block number that has been processed
+ * @apiSuccess {Object[]} transactions                      List of transactions
+ * @apiSuccess {String}   transactions.transaction_hash     Transaction hash
+ * @apiSuccess {Number}   transactions.tx_index             Index of tx inside of bundle
+ * @apiSuccess {Number}   transactions.bundle_index         Index of bundle inside of the block
+ * @apiSuccess {Number}   transactions.block_number         Block number
+ * @apiSuccess {String}   transactions.eoa_address          Address of the externally owned account that created this transaction
+ * @apiSuccess {String}   transactions.to_address           To address
+ * @apiSuccess {Number}   transactions.gas_used             Gas used in this transaction
+ * @apiSuccess {String}   transactions.gas_price            Gas price of this transaction
+ * @apiSuccess {String}   transactions.coinbase_transfer    ETH (in wei) directly transferred to the coinbase, not counting gas
+ * @apiSuccess {String}   transactions.total_miner_reward   ETH (in wei) transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {Number}   transactions.received_at          Timestamp of when the transaction was received by the relay
+ * @apiSuccess {Number}   transactions.sent_to_miners_at    Timestamp of when the relay sent the transaction to miners
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -74,7 +76,9 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
       "gas_used": 79188,
       "gas_price": "0",
       "coinbase_transfer": "10340046243502720",
-      "total_miner_reward": "10340046243502720"
+      "total_miner_reward": "10340046243502720",
+      "received_at": 1615352083,
+      "sent_to_miners_at": 1615352084
     },
     {
       "transaction_hash": "0x965aa095d75f03ba91851ce3b8f1b51fee09ae0de837e42652412b6ace18691f",
@@ -86,7 +90,9 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
       "gas_used": 103577,
       "gas_price": "0",
       "coinbase_transfer": "0",
-      "total_miner_reward": "0"
+      "total_miner_reward": "0",
+      "received_at": 1615352083,
+      "sent_to_miners_at": 1615352084
     }
   ],
   "latest_block_number": 11999809
@@ -201,31 +207,35 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
  *
  * @apiSuccess {Number}   latest_block_number   The latest block number that has been processed
  * @apiSuccess {Object[]} blocks       List of blocks.
- * @apiSuccess {Number}   blocks.block_number   Block number
- * @apiSuccess {String}   blocks.miner   The miner's address
- * @apiSuccess {String}   blocks.miner_reward   The total ETH (in wei) reward paid to the miner. This includes gas fees and coinbase transfers
+ * @apiSuccess {Number}   blocks.block_number         Block number
+ * @apiSuccess {Number}   blocks.witnessed_at         Timestamp of when this block was first seen by the relay (before being mined)
+ * @apiSuccess {String}   blocks.miner                The miner's address
+ * @apiSuccess {String}   blocks.miner_reward         The total ETH (in wei) reward paid to the miner. This includes gas fees and coinbase transfers
  * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH (in wei) transferred directly to coinbase, not counting gas
- * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
- * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not a transactions's gas price, but what mev-geth uses to sort bundles. Found by doing: total_miner_reward/gas_used. Like total_miner_reward, base_fee is subtracted from the gas fees.
- * @apiSuccess {Object[]} blocks.transactions List of transactions
- * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
- * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
- * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots", "rogue", or "miner_payout". Rogue bundles are bundles that did not originate from the flashbots relay. "miner_payout" identifies transactions from a the block's current coinbase at the head of a block
- * @apiSuccess {Number}   blocks.transactions.bundle_index index of bundle inside of the block
- * @apiSuccess {Number}   blocks.transactions.block_number   block number
- * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
- * @apiSuccess {String}   blocks.transactions.to_address to address
- * @apiSuccess {Number}   blocks.transactions.gas_used gas used in this transaction
- * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH (in wei) directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers. The burned base_fee (EIP-1559) is not credited to the miner, so the base_fee is not present in this value.
- * @apiSuccess {Boolean}  [blocks.transactions.is_megabundle] True if this transaction was submitted as part of a megabundle
+ * @apiSuccess {Number}   blocks.gas_used             Total gas used by the bundle
+ * @apiSuccess {String}   blocks.gas_price            The adjusted gas price of the bundle. This is not a transactions's gas price, but what mev-geth uses to sort bundles. Found by doing: total_miner_reward/gas_used. Like total_miner_reward, base_fee is subtracted from the gas fees.
+ * @apiSuccess {Object[]} blocks.transactions                     List of transactions
+ * @apiSuccess {String}   blocks.transactions.transaction_hash    transaction hash
+ * @apiSuccess {Number}   blocks.transactions.tx_index            index of tx inside of bundle
+ * @apiSuccess {String}   blocks.transactions.bundle_type         The bundle type, either "flashbots", "rogue", or "miner_payout". Rogue bundles are bundles that did not originate from the flashbots relay. "miner_payout" identifies transactions from a the block's current coinbase at the head of a block
+ * @apiSuccess {Number}   blocks.transactions.bundle_index        index of bundle inside of the block
+ * @apiSuccess {Number}   blocks.transactions.block_number        block number
+ * @apiSuccess {String}   blocks.transactions.eoa_address         address of the externally owned account that created this transaction
+ * @apiSuccess {String}   blocks.transactions.to_address          to address
+ * @apiSuccess {Number}   blocks.transactions.gas_used            gas used in this transaction
+ * @apiSuccess {String}   blocks.transactions.gas_price           gas price of this transaction
+ * @apiSuccess {String}   blocks.transactions.coinbase_transfer   ETH (in wei) directly transferred to the coinbase, not counting gas
+ * @apiSuccess {String}   blocks.transactions.total_miner_reward  ETH (in wei) transferred to the coinbase, including gas and direct transfers. The burned base_fee (EIP-1559) is not credited to the miner, so the base_fee is not present in this value.
+ * @apiSuccess {Boolean}  [blocks.transactions.is_megabundle]       True if this transaction was submitted as part of a megabundle
+ * @apiSuccess {Number}   blocks.transactions.received_at         Timestamp of when the transaction was received by the relay
+ * @apiSuccess {Number}   blocks.transactions.sent_to_miners_at   Timestamp of when the relay sent the transaction to miners
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
   "blocks": [
     {
       "block_number": 12006597,
+      "witnessed_at": 1615352076,
       "miner_reward": "89103402731082940",
       "miner": "0xd224ca0c819e8e97ba0136b3b95ceff503b79f53",
       "coinbase_transfers": "51418761731082940",
@@ -244,7 +254,9 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
           "gas_price": "129000000000",
           "coinbase_transfer": "0",
           "is_megabundle": true,
-          "total_miner_reward": "37684641000000000"
+          "total_miner_reward": "37684641000000000",
+          "received_at": 1615352083,
+          "sent_to_miners_at": 1615352084
         },
         {
           "transaction_hash": "0xb0686a581fde130f5e0621c6aedb2f7b4c33fbc95f89cda0e01833843a4f6b29",
@@ -258,7 +270,9 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
           "gas_price": "0",
           "is_megabundle": true,
           "coinbase_transfer": "51418761731082940",
-          "total_miner_reward": "51418761731082940"
+          "total_miner_reward": "51418761731082940",
+          "received_at": 1615352083,
+          "sent_to_miners_at": 1615352084
         }
       ]
     }
