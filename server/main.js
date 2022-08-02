@@ -119,21 +119,21 @@ app.get('/v1/transactions', async (req, res, next) => {
     }
     const transactions = await sql`
       SELECT
-          mbt.tx_hash as transaction_hash,
-          mbt.tx_index,
-          mbt.bundle_index,
-          mbt.block_number,
-          mbt.from_address as eoa_address,
-          mbt.to_address,
-          mbt.gas_used,
-          mbt.gas_price::text,
-          mbt.eth_sent_to_coinbase::text as coinbase_transfer,
-          mbt.coinbase_diff::text as total_miner_reward,
+          t.tx_hash as transaction_hash,
+          t.tx_index,
+          t.bundle_index,
+          t.block_number,
+          t.from_address as eoa_address,
+          t.to_address,
+          t.gas_used,
+          t.gas_price::text,
+          t.eth_sent_to_coinbase::text as coinbase_transfer,
+          t.coinbase_diff::text as total_miner_reward,
           b.received_timestamp as received_at,
           b.submitted_timestamp as sent_to_miners_at
       FROM
-          mined_bundle_txs mbt
-              JOIN bundles b ON mbt.bundle_id = b.id
+          mined_bundle_txs t
+              JOIN bundles b ON t.bundle_id = b.id
       WHERE
           (${beforeInt || null}::int is null or block_number < ${beforeInt}::int)
       ORDER BY
@@ -314,10 +314,10 @@ app.get('/v1/blocks', async (req, res) => {
     }
 
     const mergedBundles = await sql`
-        select
-            b.block_number,
+        SELECT
+            mb.block_number,
             sum(t.coinbase_diff)::text as miner_reward,
-            min(b.miner) as miner,
+            min(mb.miner) as miner,
             sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
             sum(t.gas_used) as gas_used,
             floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as gas_price,
@@ -332,25 +332,28 @@ app.get('/v1/blocks', async (req, res) => {
               'gas_used', t.gas_used,
               'gas_price', t.gas_price::text,
               'coinbase_transfer', t.eth_sent_to_coinbase::text,
-              'total_miner_reward', t.coinbase_diff::text
+              'total_miner_reward', t.coinbase_diff::text,
+              'received_at', b.received_timestamp,
+              'sent_to_miners_at', b.submitted_timestamp
             ) ORDER BY t.bundle_index, t.tx_index) as transactions
-        from
-            mined_bundles b
-              join mined_bundle_txs t ON b.block_number = t.block_number AND b.bundle_index = t.bundle_index
-        where
-            (${beforeInt || null}::int is null or b.block_number < ${beforeInt}::int) and
-            (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}::int) and
-            (${miner || null}::text is null or b.miner = ${miner}) and
-            (${from || null}::text is null or b.block_number IN (SELECT block_number from mined_bundle_txs where from_address = ${from}))
-        group by
-            b.block_number
-        order by
-            b.block_number desc
-        limit
+        FROM
+            mined_bundles mb
+              JOIN mined_bundle_txs t ON mb.block_number = t.block_number AND mb.bundle_index = t.bundle_index
+              JOIN bundles b ON t.bundle_id = b.id
+        WHERE
+            (${beforeInt || null}::int is null or mb.block_number < ${beforeInt}::int) and
+            (${blockNumInt || null}::int is null or mb.block_number = ${blockNumInt}::int) and
+            (${miner || null}::text is null or mb.miner = ${miner}) and
+            (${from || null}::text is null or mb.block_number IN (SELECT block_number FROM mined_bundle_txs WHERE from_address = ${from}))
+        GROUP BY
+            mb.block_number
+        ORDER BY
+            mb.block_number desc
+        LIMIT
           ${limit}`
 
     const megabundles = await sql`
-        select
+        SELECT
             mmb.block_number,
             sum(t.coinbase_diff)::text as miner_reward,
             min(blocks.miner) as miner,
@@ -367,25 +370,28 @@ app.get('/v1/blocks', async (req, res) => {
               'gas_used', t.gas_used,
               'gas_price', t.gas_price::text,
               'coinbase_transfer', t.eth_sent_to_coinbase::text,
-              'total_miner_reward', t.coinbase_diff::text
+              'total_miner_reward', t.coinbase_diff::text,
+              'received_at', b.received_timestamp,
+              'sent_to_miners_at', b.submitted_timestamp
             ) ORDER BY t.bundle_index, t.tx_index) as transactions
-        from
-            mined_megabundle_bundles b
-              join mined_megabundles mmb ON b.megabundle_id = mmb.megabundle_id
-              join mined_megabundle_bundle_txs t ON t.megabundle_id = mmb.megabundle_id
-              join blocks ON blocks.block_number = mmb.block_number
-        where
+        FROM
+            mined_megabundle_bundles mmbb
+              JOIN mined_megabundles mmb ON mmbb.megabundle_id = mmb.megabundle_id
+              JOIN mined_megabundle_bundle_txs t ON t.megabundle_id = mmb.megabundle_id
+              JOIN blocks ON blocks.block_number = mmb.block_number
+              JOIN bundles b ON t.bundle_id = b.id
+        WHERE
             (${beforeInt || null}::bigint is null or mmb.block_number < ${beforeInt}::bigint) and
             (${blockNumInt || null}::bigint is null or mmb.block_number = ${blockNumInt}::bigint) and
             (${miner || null}::text is null or blocks.miner = ${miner}) and
             (${
               from || null
             }::text is null or mmb.block_number IN (SELECT mined_megabundles.block_number from mined_megabundle_bundle_txs JOIN mined_megabundles ON mined_megabundles.megabundle_id = mined_megabundle_bundle_txs.megabundle_id where from_address = ${from}))
-        group by
+        GROUP BY
             mmb.block_number
-        order by
+        ORDER BY
             mmb.block_number desc
-        limit
+        LIMIT
           ${limit}`
 
     // Each result set is sparse, find all unique block numbers in both bundle types, rebuild array sequentially
