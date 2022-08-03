@@ -54,6 +54,7 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
  * @apiSuccess {Number}   transactions.tx_index             Index of tx inside of bundle
  * @apiSuccess {Number}   transactions.bundle_index         Index of bundle inside of the block
  * @apiSuccess {Number}   transactions.block_number         Block number
+ * @apiSuccess {String}   transactions.eao_address          Address of the externally owned account that created this transaction (soon to be deprecated)
  * @apiSuccess {String}   transactions.eoa_address          Address of the externally owned account that created this transaction
  * @apiSuccess {String}   transactions.to_address           To address
  * @apiSuccess {Number}   transactions.gas_used             Gas used in this transaction
@@ -71,6 +72,7 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
       "tx_index": 0,
       "bundle_index": 0,
       "block_number": 11999806,
+      "eao_address": "0x421125ca608A35458B2C99DA39CD55B70bA202a4",
       "eoa_address": "0x421125ca608A35458B2C99DA39CD55B70bA202a4",
       "to_address": "0xa57Bd00134B2850B2a1c55860c9e9ea100fDd6CF",
       "gas_used": 79188,
@@ -85,6 +87,7 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
       "tx_index": 0,
       "bundle_index": 0,
       "block_number": 11999435,
+      "eao_address": "0x1F00ACFEdC298253487D91758bcfe9D7a6Ba2c83",
       "eoa_address": "0x1F00ACFEdC298253487D91758bcfe9D7a6Ba2c83",
       "to_address": "0xb10E56Edb7698C960f1562c7edcC15612900c4A5",
       "gas_used": 103577,
@@ -129,6 +132,7 @@ app.get('/v1/transactions', async (req, res, next) => {
           t.tx_index,
           t.bundle_index,
           t.block_number,
+          t.from_address as eao_address,
           t.from_address as eoa_address,
           t.to_address,
           t.gas_used,
