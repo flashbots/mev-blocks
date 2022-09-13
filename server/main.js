@@ -33,12 +33,6 @@ process.on('unhandledRejection', (err) => {
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const sql = postgres(process.env.POSTGRES_DSN)
 
-function isMegabundleBlock(mergedBlock, megabundleBlock) {
-  if (mergedBlock === undefined) return true
-  if (megabundleBlock === undefined) return false
-  return megabundleBlock.transactions.length > mergedBlock.transactions.length
-}
-
 /**
  * @api {get} /v1/transactions Get transactions
  * @apiVersion 1.0.0
@@ -58,8 +52,8 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
  * @apiSuccess {String}   transactions.to_address to address
  * @apiSuccess {Number}   transactions.gas_used gas used in this transaction
  * @apiSuccess {String}   transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   transactions.coinbase_transfer ETH (in wei) directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers
+ * @apiSuccess {String}   transactions.eth_sent_to_fee_recipient ETH (in wei) directly transferred to the fee recipient, not counting gas
+ * @apiSuccess {String}   transactions.fee_recipient_eth_diff ETH (in wei) transferred to the fee recipient, including gas and direct transfers
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
@@ -73,8 +67,8 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
       "to_address": "0xa57Bd00134B2850B2a1c55860c9e9ea100fDd6CF",
       "gas_used": 79188,
       "gas_price": "0",
-      "coinbase_transfer": "10340046243502720",
-      "total_miner_reward": "10340046243502720"
+      "eth_sent_to_fee_recipient": "10340046243502720",
+      "fee_recipient_eth_diff": "10340046243502720"
     },
     {
       "transaction_hash": "0x965aa095d75f03ba91851ce3b8f1b51fee09ae0de837e42652412b6ace18691f",
@@ -85,14 +79,14 @@ function isMegabundleBlock(mergedBlock, megabundleBlock) {
       "to_address": "0xb10E56Edb7698C960f1562c7edcC15612900c4A5",
       "gas_used": 103577,
       "gas_price": "0",
-      "coinbase_transfer": "0",
-      "total_miner_reward": "0"
+      "eth_sent_to_fee_recipient": "0",
+      "fee_recipient_eth_diff": "0"
     }
   ],
   "latest_block_number": 11999809
 }
  */
-app.get('/v1/transactions', async (req, res, next) => {
+app.get('/v1/transactions', async (req, res) => {
   try {
     let before = req.query.before
     if (before === 'latest') {
@@ -127,10 +121,14 @@ app.get('/v1/transactions', async (req, res, next) => {
           to_address,
           gas_used,
           gas_price::text,
-          eth_sent_to_coinbase::text as coinbase_transfer,
-          coinbase_diff::text as total_miner_reward
+          
+          eth_sent_to_fee_recipient::text as coinbase_transfer,
+          eth_sent_to_fee_recipient::text as eth_sent_to_fee_recipient,
+          
+          fee_recipient_eth_diff::text as total_miner_reward,
+          fee_recipient_eth_diff::text as fee_recipient_eth_diff
       from
-          mined_bundle_txs
+          included_built_block_bundle_txs
       where
           (${beforeInt || null}::int is null or block_number < ${beforeInt}::int)
       order by
@@ -149,41 +147,6 @@ app.get('/v1/transactions', async (req, res, next) => {
   }
 })
 
-function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
-  if (megaBundleBlock === undefined) return mergedBlock
-  if (mergedBlock === undefined || megaBundleBlock.transactions.length > mergedBlock.transactions.length) {
-    return {
-      ...megaBundleBlock,
-      transactions: megaBundleBlock.transactions.map((tx) => {
-        return {
-          ...tx,
-          is_megabundle: true
-        }
-      })
-    }
-  }
-
-  // Even though we individually tag transactions as "is_megabundle", we still need to report on overall block metrics, so we need to select an overall block to return and parse transactions for.
-  const baseBlock = isMegabundleBlock(mergedBlock, megaBundleBlock) ? megaBundleBlock : mergedBlock
-  const megaBundleTransactions = megaBundleBlock.transactions
-  const mergedTransactions = mergedBlock.transactions
-  const megaBundleIdentifiedTransactions = _.map(baseBlock.transactions, (transaction, i) => {
-    const megaBundleTx = megaBundleTransactions[i]
-    const mergedTx = mergedTransactions[i]
-    if ((megaBundleTx === undefined && mergedTx !== undefined) || megaBundleTx.transaction_hash !== mergedTx.transaction_hash) {
-      return transaction
-    }
-    return {
-      ...transaction,
-      is_megabundle: true
-    }
-  })
-  return {
-    ...baseBlock,
-    transactions: megaBundleIdentifiedTransactions
-  }
-}
-
 /**
  * @api {get} /v1/blocks Get blocks
  * @apiVersion 1.0.0
@@ -191,7 +154,7 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
  * @apiDescription Returns the 100 most recent flashbots blocks. This also contains a list of transactions that were part of the flashbots bundle. Use query parameters to filter this down to blocks you're interested in.
  *
  * @apiParam (Query string) {Number}   [block_number]  Returns just a single block equal to the given block_number
- * @apiParam (Query string) {String}   [miner]  Filter to a single miner address
+ * @apiParam (Query string) {String}   [fee_recipient]  Filter to a single miner address
  * @apiParam (Query string) {String}   [from]   Filter to get blocks including transactions sent by from
  * @apiParam (Query string) {Number}   [before=latest]  Filter blocks to before this block number (exclusive, does not include this block number)
  * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
@@ -199,33 +162,32 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
  * @apiSuccess {Number}   latest_block_number   The latest block number that has been processed
  * @apiSuccess {Object[]} blocks       List of blocks.
  * @apiSuccess {Number}   blocks.block_number   Block number
- * @apiSuccess {String}   blocks.miner   The miner's address
- * @apiSuccess {String}   blocks.miner_reward   The total ETH (in wei) reward paid to the miner. This includes gas fees and coinbase transfers
- * @apiSuccess {String}   blocks.coinbase_transfers   The total ETH (in wei) transferred directly to coinbase, not counting gas
+ * @apiSuccess {String}   blocks.fee_recipient   The Fee Recipient's address
+ * @apiSuccess {String}   blocks.fee_recipient_eth_diff   The total ETH (in wei) reward paid to the fee recipient. This includes gas fees and direct eth transfers
+ * @apiSuccess {String}   blocks.eth_sent_to_fee_recipient   The total ETH (in wei) transferred directly to the fee recipient, not counting gas
  * @apiSuccess {Number}   blocks.gas_used   Total gas used by the bundle
- * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not a transactions's gas price, but what mev-geth uses to sort bundles. Found by doing: total_miner_reward/gas_used. Like total_miner_reward, base_fee is subtracted from the gas fees.
+ * @apiSuccess {String}   blocks.gas_price   The adjusted gas price of the bundle. This is not a transactions's gas price, but what mev-geth uses to sort bundles. Found by doing: fee_recipient_eth_diff/gas_used. Like fee_recipient_eth_diff, base_fee is subtracted from the gas fees.
  * @apiSuccess {Object[]} blocks.transactions List of transactions
  * @apiSuccess {String}   blocks.transactions.transaction_hash transaction hash
  * @apiSuccess {Number}   blocks.transactions.tx_index index of tx inside of bundle
- * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots", "rogue", or "miner_payout". Rogue bundles are bundles that did not originate from the flashbots relay. "miner_payout" identifies transactions from a the block's current coinbase at the head of a block
+ * @apiSuccess {String}   blocks.transactions.bundle_type The bundle type, either "flashbots" or "mempool". Mempool indicates some non-relayed transactions were included between flashbots-relayed bundles.
  * @apiSuccess {Number}   blocks.transactions.bundle_index index of bundle inside of the block
  * @apiSuccess {Number}   blocks.transactions.block_number   block number
  * @apiSuccess {String}   blocks.transactions.eoa_address address of the externally owned account that created this transaction
  * @apiSuccess {String}   blocks.transactions.to_address to address
  * @apiSuccess {Number}   blocks.transactions.gas_used gas used in this transaction
  * @apiSuccess {String}   blocks.transactions.gas_price gas price of this transaction
- * @apiSuccess {String}   blocks.transactions.coinbase_transfer ETH (in wei) directly transferred to the coinbase, not counting gas
- * @apiSuccess {String}   blocks.transactions.total_miner_reward ETH (in wei) transferred to the coinbase, including gas and direct transfers. The burned base_fee (EIP-1559) is not credited to the miner, so the base_fee is not present in this value.
- * @apiSuccess {Boolean}  [blocks.transactions.is_megabundle] True if this transaction was submitted as part of a megabundle
+ * @apiSuccess {String}   blocks.transactions.eth_sent_to_fee_recipient ETH (in wei) directly transferred to the fee recipient, not counting gas
+ * @apiSuccess {String}   blocks.transactions.fee_recipient_eth_diff ETH (in wei) transferred to the fee recipient, including gas and direct transfers. The burned base_fee (EIP-1559) is not credited to the fee recipient, so the base_fee is not present in this value.
  * @apiSuccessExample {json} Success-Response:
  * HTTP/1.1 200 OK
 {
   "blocks": [
     {
       "block_number": 12006597,
-      "miner_reward": "89103402731082940",
-      "miner": "0xd224ca0c819e8e97ba0136b3b95ceff503b79f53",
-      "coinbase_transfers": "51418761731082940",
+      "fee_recipient_eth_diff": "89103402731082940",
+      "fee_recipient": "0xd224ca0c819e8e97ba0136b3b95ceff503b79f53",
+      "eth_sent_to_fee_recipient": "51418761731082940",
       "gas_used": 374858,
       "gas_price": "237699082668",
       "transactions": [
@@ -239,9 +201,8 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
           "to_address": "0x111111125434b319222CdBf8C261674aDB56F3ae",
           "gas_used": 292129,
           "gas_price": "129000000000",
-          "coinbase_transfer": "0",
-          "is_megabundle": true,
-          "total_miner_reward": "37684641000000000"
+          "eth_sent_to_fee_recipient": "0",
+          "fee_recipient_eth_diff": "37684641000000000"
         },
         {
           "transaction_hash": "0xb0686a581fde130f5e0621c6aedb2f7b4c33fbc95f89cda0e01833843a4f6b29",
@@ -253,9 +214,8 @@ function inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock) {
           "to_address": "0xa57Bd00134B2850B2a1c55860c9e9ea100fDd6CF",
           "gas_used": 82729,
           "gas_price": "0",
-          "is_megabundle": true,
-          "coinbase_transfer": "51418761731082940",
-          "total_miner_reward": "51418761731082940"
+          "eth_sent_to_fee_recipient": "51418761731082940",
+          "fee_recipient_eth_diff": "51418761731082940"
         }
       ]
     }
@@ -300,9 +260,10 @@ app.get('/v1/blocks', async (req, res) => {
       }
     }
 
-    let miner = req.query.miner
-    if (miner) {
-      miner = utils.toChecksumAddress(miner)
+    // allow both query by fee_recipient or miner
+    let feeRecipient = req.query.fee_recipient || req.query.miner
+    if (feeRecipient) {
+      feeRecipient = utils.toChecksumAddress(feeRecipient)
     }
 
     let from = req.query.from
@@ -310,14 +271,18 @@ app.get('/v1/blocks', async (req, res) => {
       from = utils.toChecksumAddress(from)
     }
 
-    const mergedBundles = await sql`
+    const bundles = await sql`
         select
             b.block_number,
-            sum(t.coinbase_diff)::text as miner_reward,
-            min(b.miner) as miner,
-            sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
+            sum(t.fee_recipient_eth_diff)::text as miner_reward,
+            sum(t.fee_recipient_eth_diff)::text as fee_recipient_eth_diff,
+            min(b.fee_recipient) as miner,
+            min(b.fee_recipient) as fee_recipient,
+            sum(t.eth_sent_to_fee_recipient)::text as coinbase_transfers,
+            sum(t.eth_sent_to_fee_recipient)::text as eth_sent_to_fee_recipient,
             sum(t.gas_used) as gas_used,
-            floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as gas_price,
+            floor(sum(t.fee_recipient_eth_diff)/sum(t.gas_used))::text as gas_price,
+            floor(sum(t.fee_recipient_eth_diff)/sum(t.gas_used))::text as effective_priority_fee_gas_price,
             array_agg(json_build_object(
               'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,
@@ -328,17 +293,23 @@ app.get('/v1/blocks', async (req, res) => {
               'to_address', t.to_address,
               'gas_used', t.gas_used,
               'gas_price', t.gas_price::text,
-              'coinbase_transfer', t.eth_sent_to_coinbase::text,
-              'total_miner_reward', t.coinbase_diff::text
+                
+              'coinbase_transfer', t.eth_sent_to_fee_recipient::text,
+              'eth_sent_to_fee_recipient', t.eth_sent_to_fee_recipient::text,
+                
+              'total_miner_reward', t.fee_recipient_eth_diff::text,
+              'fee_recipient_eth_diff', t.fee_recipient_eth_diff::text
             ) ORDER BY t.bundle_index, t.tx_index) as transactions
         from
-            mined_bundles b
-              join mined_bundle_txs t ON b.block_number = t.block_number AND b.bundle_index = t.bundle_index
+            included_built_block_bundles b
+              join included_built_block_bundle_txs t ON b.block_number = t.block_number AND b.bundle_index = t.bundle_index
         where
             (${beforeInt || null}::int is null or b.block_number < ${beforeInt}::int) and
             (${blockNumInt || null}::int is null or b.block_number = ${blockNumInt}::int) and
-            (${miner || null}::text is null or b.miner = ${miner}) and
-            (${from || null}::text is null or b.block_number IN (SELECT block_number from mined_bundle_txs where from_address = ${from}))
+            (${feeRecipient || null}::text is null or b.fee_recipient = ${feeRecipient}) and
+            (${
+              from || null
+            }::text is null or b.block_number IN (SELECT block_number from included_built_block_bundle_txs where from_address = ${from}))
         group by
             b.block_number
         order by
@@ -346,64 +317,13 @@ app.get('/v1/blocks', async (req, res) => {
         limit
           ${limit}`
 
-    const megabundles = await sql`
-        select
-            mmb.block_number,
-            sum(t.coinbase_diff)::text as miner_reward,
-            min(blocks.miner) as miner,
-            sum(t.eth_sent_to_coinbase)::text as coinbase_transfers,
-            sum(t.gas_used) as gas_used,
-            floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as gas_price,
-            array_agg(json_build_object(
-              'transaction_hash', t.tx_hash,
-              'tx_index', t.tx_index,
-              'bundle_index', t.bundle_index,
-              'block_number', mmb.block_number,
-              'eoa_address', t.from_address,
-              'to_address', t.to_address,
-              'gas_used', t.gas_used,
-              'gas_price', t.gas_price::text,
-              'coinbase_transfer', t.eth_sent_to_coinbase::text,
-              'total_miner_reward', t.coinbase_diff::text
-            ) ORDER BY t.bundle_index, t.tx_index) as transactions
-        from
-            mined_megabundle_bundles b
-              join mined_megabundles mmb ON b.megabundle_id = mmb.megabundle_id
-              join mined_megabundle_bundle_txs t ON t.megabundle_id = mmb.megabundle_id
-              join blocks ON blocks.block_number = mmb.block_number
-        where
-            (${beforeInt || null}::bigint is null or mmb.block_number < ${beforeInt}::bigint) and
-            (${blockNumInt || null}::bigint is null or mmb.block_number = ${blockNumInt}::bigint) and
-            (${miner || null}::text is null or blocks.miner = ${miner}) and
-            (${
-              from || null
-            }::text is null or mmb.block_number IN (SELECT mined_megabundles.block_number from mined_megabundle_bundle_txs JOIN mined_megabundles ON mined_megabundles.megabundle_id = mined_megabundle_bundle_txs.megabundle_id where from_address = ${from}))
-        group by
-            mmb.block_number
-        order by
-            mmb.block_number desc
-        limit
-          ${limit}`
-
     // Each result set is sparse, find all unique block numbers in both bundle types, rebuild array sequentially
-    const blockNumbers = _.chain([...mergedBundles, ...megabundles])
-      .map('block_number')
-      .uniq()
-      .sort()
-      .takeRight(limit)
-      .value()
 
-    const mergedByBlockNumber = _.keyBy(mergedBundles, 'block_number')
-    const megabundleByBlockNumber = _.keyBy(megabundles, 'block_number')
-    const inferredBundleBlocks = _.map(blockNumbers, (blockNumber) => {
-      const megaBundleBlock = megabundleByBlockNumber[blockNumber]
-      const mergedBlock = mergedByBlockNumber[blockNumber]
-      return inferMegabundleTransactionsByBlock(megaBundleBlock, mergedBlock)
-    })
+    const bundlesByBlockNumber = _.keyBy(bundles, 'block_number')
     const latestBlockNumber = await sql`select max(block_number) as block_number
                                         from blocks`
 
-    res.json({ blocks: inferredBundleBlocks, latest_block_number: latestBlockNumber[0].block_number })
+    res.json({ blocks: bundlesByBlockNumber, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
     console.error('unhandled error in /transactions', error)
     Sentry.captureException(error)
