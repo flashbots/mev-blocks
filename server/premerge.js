@@ -294,6 +294,7 @@ export async function getPremergeBlocks(sql, req, res) {
             sum(t.eth_sent_to_coinbase)::text as eth_sent_to_fee_recipient,
             sum(t.gas_used) as gas_used,
             floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as gas_price,
+            floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as effective_priority_fee_gas_price,
             array_agg(json_build_object(
               'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,
@@ -337,6 +338,7 @@ export async function getPremergeBlocks(sql, req, res) {
             sum(t.eth_sent_to_coinbase)::text as fee_recipient_eth_diff,
             sum(t.gas_used) as gas_used,
             floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as gas_price,
+            floor(sum(t.coinbase_diff)/sum(t.gas_used))::text as effective_priority_fee_gas_price,
             array_agg(json_build_object(
               'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,

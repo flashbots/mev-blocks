@@ -6,7 +6,7 @@ import utils from 'web3-utils'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import _ from 'lodash'
-import {getPremergeBlocks, getPremergeTransactions} from './premerge.js'
+import { getPremergeBlocks, getPremergeTransactions } from './premerge.js'
 
 const MERGE_BLOCK_NUMBER = 999999999
 
@@ -266,7 +266,7 @@ app.get('/v1/blocks', async (req, res) => {
       }
     }
 
-    if (blockNumInt < MERGE_BLOCK_NUMBER || beforeInt < MERGE_BLOCK_NUMBER ) {
+    if (blockNumInt < MERGE_BLOCK_NUMBER || beforeInt < MERGE_BLOCK_NUMBER) {
       return getPremergeBlocks(sql, req, res)
     }
 
@@ -333,9 +333,9 @@ app.get('/v1/blocks', async (req, res) => {
     const latestBlockNumber = await sql`select max(block_number) as block_number
                                         from blocks`
 
-    res.json({ paris: 1, blocks: bundlesByBlockNumber, latest_block_number: latestBlockNumber[0].block_number },)
+    res.json({ paris: 1, blocks: bundlesByBlockNumber, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
-    console.error('unhandled error in /transactions', error)
+    console.error('unhandled error in /blocks', error)
     Sentry.captureException(error)
     res.status(500)
     res.end('Internal Server Error')
