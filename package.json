@@ -4,6 +4,7 @@
   "main": "server/index.js",
   "author": "Jason Paryani <github@jparyani.com>",
   "license": "MIT",
+  "type":"module",
   "scripts": {
     "lint": "eslint .",
     "gen-docs": "apidoc -i server/ -o apidoc/",
@@ -16,15 +17,15 @@
     "description": "An API for displaying flashbots blocks and transactions"
   },
   "dependencies": {
-    "@sentry/node": "^6.1.0",
-    "cors": "^2.8.5",
+    "@sentry/node": "6.1.0",
+    "cors": "2.8.5",
     "express": "4.18.1",
     "express-rate-limit": "5.5.1",
     "lodash": "4.17.21",
     "morgan": "1.10.0",
     "postgres": "1.0.2",
     "web3-utils": "1.7.5",
-    "yarn": "^1.22.19"
+    "yarn": "1.22.19"
   },
   "devDependencies": {
     "apidoc": "^0.26.0",
