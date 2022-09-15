@@ -8,8 +8,6 @@ import rateLimit from 'express-rate-limit'
 import _ from 'lodash'
 import { getPremergeBlocks, getPremergeTransactions } from './premerge.js'
 
-const MERGE_BLOCK_NUMBER = 999999999
-
 if (process.env.SENTRY_DSN) {
   console.log('initializing sentry')
   Sentry.init({
@@ -34,6 +32,7 @@ process.on('unhandledRejection', (err) => {
 })
 
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
+const MERGE_BLOCK_NUMBER = parseInt(process.env.MERGE_BLOCK_NUMBER || '1')
 const sql = postgres(process.env.POSTGRES_DSN)
 
 /**
@@ -292,7 +291,7 @@ app.get('/v1/blocks', async (req, res) => {
             sum(t.eth_sent_to_fee_recipient)::text as eth_sent_to_fee_recipient,
             sum(t.gas_used) as gas_used,
             floor(sum(t.fee_recipient_eth_diff)/sum(t.gas_used))::text as gas_price,
-            floor(sum(t.fee_recipient_eth_diff)/sum(t.gas_used))::text as effective_priority_fee_gas_price,
+            floor(sum(t.fee_recipient_eth_diff)/sum(t.gas_used))::text as effective_priority_fee,
             array_agg(json_build_object(
               'transaction_hash', t.tx_hash,
               'tx_index', t.tx_index,
