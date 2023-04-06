@@ -6,7 +6,7 @@
   "license": "MIT",
   "type":"module",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint server",
     "gen-docs": "apidoc -i server/ -o apidoc/",
     "dump-s3": "node scripts/dump_to_s3.js",
     "start": "node server/main.js"

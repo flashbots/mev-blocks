@@ -328,11 +328,11 @@ app.get('/v1/blocks', async (req, res) => {
 
     // Each result set is sparse, find all unique block numbers in both bundle types, rebuild array sequentially
 
-    const bundlesByBlockNumber = _.keyBy(bundles, 'block_number')
+    // const bundlesByBlockNumber = _.keyBy(bundles, 'block_number')
     const latestBlockNumber = await sql`select max(block_number) as block_number
                                         from blocks`
 
-    res.json({ paris: 1, blocks: bundlesByBlockNumber, latest_block_number: latestBlockNumber[0].block_number })
+    res.json({ paris: 1, blocks: bundles, latest_block_number: latestBlockNumber[0].block_number })
   } catch (error) {
     console.error('unhandled error in /blocks', error)
     Sentry.captureException(error)
