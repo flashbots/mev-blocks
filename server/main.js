@@ -356,6 +356,83 @@ app.get('/v1/all_blocks', async (req, res) => {
   }
 })
 
+/**
+ * @api {get} /v1/bundle/:hash Get bundle by hash
+ * @apiVersion 1.0.0
+ * @apiGroup Flashbots
+ * @apiDescription Returns a bundle by hash.
+ * @apiParam (Path parameter) {String}   hash  Bundle hash
+ *
+ * @apiSuccess {Object[]} transactions       List of transactions.
+ * @apiSuccess {String}   transactions.transaction_hash transaction hash
+ * @apiSuccess {Number}   transactions.tx_index index of tx inside of bundle
+ * @apiSuccess {Number}   transactions.bundle_index index of bundle inside of the block
+ * @apiSuccess {Number}   transactions.block_number   block number
+ * @apiSuccess {String}   transactions.eoa_address address of the externally owned account that created this transaction
+ * @apiSuccess {String}   transactions.to_address to address
+ * @apiSuccess {Number}   transactions.gas_used gas used in this transaction
+ * @apiSuccess {String}   transactions.gas_price gas price of this transaction
+ * @apiSuccess {String}   transactions.eth_sent_to_fee_recipient ETH (in wei) directly transferred to the fee recipient, not counting gas
+ * @apiSuccess {String}   transactions.fee_recipient_eth_diff ETH (in wei) transferred to the fee recipient, including gas and direct transfers
+ * @apiSuccessExample {json} Success-Response:
+ * HTTP/1.1 200 OK
+ {
+  "transactions": [
+    {
+        "transaction_hash": "0xd9cdf1483a85aa206625c66fea49059b96ffae1c086f76664cfa3f91a495d73a",
+        "tx_index": 0,
+        "bundle_index": 3,
+        "block_number": 9091437,
+        "eao_address": "0x8D460B72eaF3d63830E16C22d1Fc6908D0834Abe",
+        "to_address": "0x8D460B72eaF3d63830E16C22d1Fc6908D0834Abe",
+        "gas_used": 21000,
+        "gas_price": "1000000000",
+        "coinbase_transfer": "0",
+        "eth_sent_to_fee_recipient": "0",
+        "total_miner_reward": "21000000000000",
+        "fee_recipient_eth_diff": "21000000000000"
+    }
+  ],
+}
+ */
+app.get('/v1/bundle/:hash', async (req, res) => {
+  try {
+    let hash = req.params.hash
+    if (hash.slice(0, 2) === '0x') {
+      hash = hash.slice(2)
+    }
+    hash = Buffer.from(hash, 'hex')
+    const transactions = await sql`
+        select
+            ibbbt.tx_hash as transaction_hash,
+            ibbbt.tx_index,
+            ibbbt.bundle_index,
+            ibbbt.block_number,
+            ibbbt.from_address as eao_address,
+            ibbbt.to_address,
+            ibbbt.gas_used,
+            ibbbt.gas_price::text,
+
+            ibbbt.eth_sent_to_fee_recipient::text as coinbase_transfer,
+            ibbbt.eth_sent_to_fee_recipient::text as eth_sent_to_fee_recipient,
+
+            ibbbt.fee_recipient_eth_diff::text as total_miner_reward,
+            ibbbt.fee_recipient_eth_diff::text as fee_recipient_eth_diff
+        from
+            included_built_block_bundles ibbb
+                join included_built_block_bundle_txs ibbbt on ibbbt.block_id = ibbb.block_id and ibbbt.bundle_index = ibbb.bundle_index
+        where ibbb.sbundle_hash = ${hash}
+        order by tx_index asc
+        limit 50`
+    res.json({ transactions })
+  } catch (error) {
+    console.error('unhandled error in /bundle/:hash', error)
+    Sentry.captureException(error)
+    res.status(500)
+    res.end('Internal Server Error')
+  }
+})
+
 app.use(express.static('apidoc'))
 
 app.listen(PORT, () => {
