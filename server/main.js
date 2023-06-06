@@ -33,6 +33,7 @@ process.on('unhandledRejection', (err) => {
 
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const MERGE_BLOCK_NUMBER = parseInt(process.env.MERGE_BLOCK_NUMBER || '1')
+const BUNDLE_TX_LIMIT = parseInt(process.env.BUNDLE_TX_LIMIT || '75')
 const sql = postgres(process.env.POSTGRES_DSN)
 
 /**
@@ -423,7 +424,10 @@ app.get('/v1/bundle/:hash', async (req, res) => {
                 join included_built_block_bundle_txs ibbbt on ibbbt.block_id = ibbb.block_id and ibbbt.bundle_index = ibbb.bundle_index
         where ibbb.sbundle_hash = ${hash}
         order by tx_index asc
-        limit 50`
+        limit ${BUNDLE_TX_LIMIT}`
+    if (transactions.length >= BUNDLE_TX_LIMIT) {
+      console.error('bundle tx limit reached', hash)
+    }
     res.json({ transactions })
   } catch (error) {
     console.error('unhandled error in /bundle/:hash', error)
