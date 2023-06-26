@@ -10,7 +10,7 @@ import { getPremergeBlocks, getPremergeTransactions } from './premerge.js'
 
 const MAX_QUERY_LIMIT = 100
 const DEFAULT_QUERY_LIMIT = 10
-const DB_POOL_SIZE = 20
+const DB_POOL_SIZE = parseInt(process.env.DB_POOL_SIZE || '20')
 
 if (process.env.SENTRY_DSN) {
   console.log('initializing sentry')
