@@ -8,6 +8,10 @@ import rateLimit from 'express-rate-limit'
 import _ from 'lodash'
 import { getPremergeBlocks, getPremergeTransactions } from './premerge.js'
 
+const MAX_QUERY_LIMIT = 100
+const DEFAULT_QUERY_LIMIT = 10
+const DB_POOL_SIZE = parseInt(process.env.DB_POOL_SIZE || '20')
+
 if (process.env.SENTRY_DSN) {
   console.log('initializing sentry')
   Sentry.init({
@@ -18,7 +22,7 @@ if (process.env.SENTRY_DSN) {
 const app = express()
 app.set('trust proxy', true)
 
-app.use(morgan('short'))
+app.use(morgan('tiny'))
 app.use(
   rateLimit({
     windowMs: 60 * 1000, // 1 minute
@@ -34,7 +38,7 @@ process.on('unhandledRejection', (err) => {
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const MERGE_BLOCK_NUMBER = parseInt(process.env.MERGE_BLOCK_NUMBER || '1')
 const BUNDLE_TX_LIMIT = parseInt(process.env.BUNDLE_TX_LIMIT || '75')
-const sql = postgres(process.env.POSTGRES_DSN)
+const sql = postgres(process.env.POSTGRES_DSN, { max: DB_POOL_SIZE })
 
 /**
  * @api {get} /v1/transactions Get transactions
@@ -43,7 +47,7 @@ const sql = postgres(process.env.POSTGRES_DSN)
  * @apiDescription Returns the 100 most recent flashbots transactions. Use the `before` query param to filter to transactions before a given block number.
  *
  * @apiParam (Query string) {Number}   [before=latest]  Filter transactions to before this block number (exclusive, does not include this block number)
- * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of transactions that are returned
+ * @apiParam (Query string) {Number{1-100}}   [limit=10]  Number of transactions that are returned
  *
  * @apiSuccess {Number}   latest_block_number   The latest block number that has been processed
  * @apiSuccess {Object[]} transactions       List of transactions.
@@ -97,11 +101,11 @@ app.get('/v1/transactions', async (req, res) => {
     }
     let limit = parseInt(req.query.limit)
     if (isNaN(limit)) {
-      limit = 100
+      limit = DEFAULT_QUERY_LIMIT
     }
-    if (limit < 0 || limit > 10000) {
+    if (limit < 0 || limit > MAX_QUERY_LIMIT) {
       res.status(400)
-      res.json({ error: `invalid limit param provided, must be less than 10000 and more than 0: ${req.query.limit}` })
+      res.json({ error: `invalid limit param provided, must be less than ${MAX_QUERY_LIMIT} and more than 0: ${req.query.limit}` })
       return
     }
 
@@ -163,7 +167,7 @@ app.get('/v1/transactions', async (req, res) => {
  * @apiParam (Query string) {String}   [fee_recipient]  Filter to a single miner address
  * @apiParam (Query string) {String}   [from]   Filter to get blocks including transactions sent by from
  * @apiParam (Query string) {Number}   [before=latest]  Filter blocks to before this block number (exclusive, does not include this block number)
- * @apiParam (Query string) {Number{1-10000}}   [limit=100]  Number of blocks that are returned
+ * @apiParam (Query string) {Number{1-100}}   [limit=10]  Number of blocks that are returned
  *
  * @apiSuccess {Number}   latest_block_number   The latest block number that has been processed
  * @apiSuccess {Object[]} blocks       List of blocks.
@@ -238,11 +242,11 @@ app.get('/v1/blocks', async (req, res) => {
     }
     let limit = parseInt(req.query.limit)
     if (isNaN(limit)) {
-      limit = 100
+      limit = DEFAULT_QUERY_LIMIT
     }
-    if (limit < 0 || limit > 10000) {
+    if (limit < 0 || limit > MAX_QUERY_LIMIT) {
       res.status(400)
-      res.json({ error: `invalid limit param provided, must be less than 10000 and more than 0 but got: ${req.query.limit}` })
+      res.json({ error: `invalid limit param provided, must be less than ${MAX_QUERY_LIMIT} and more than 0 but got: ${req.query.limit}` })
       return
     }
 
