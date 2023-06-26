@@ -18,7 +18,7 @@ if (process.env.SENTRY_DSN) {
 const app = express()
 app.set('trust proxy', true)
 
-app.use(morgan('short'))
+app.use(morgan('tiny'))
 app.use(
   rateLimit({
     windowMs: 60 * 1000, // 1 minute
