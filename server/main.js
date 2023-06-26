@@ -10,6 +10,7 @@ import { getPremergeBlocks, getPremergeTransactions } from './premerge.js'
 
 const MAX_QUERY_LIMIT = 100
 const DEFAULT_QUERY_LIMIT = 10
+const DB_POOL_SIZE = 20
 
 if (process.env.SENTRY_DSN) {
   console.log('initializing sentry')
@@ -37,7 +38,7 @@ process.on('unhandledRejection', (err) => {
 const PORT = parseInt(_.get(process.env, 'PORT', '31080'))
 const MERGE_BLOCK_NUMBER = parseInt(process.env.MERGE_BLOCK_NUMBER || '1')
 const BUNDLE_TX_LIMIT = parseInt(process.env.BUNDLE_TX_LIMIT || '75')
-const sql = postgres(process.env.POSTGRES_DSN)
+const sql = postgres(process.env.POSTGRES_DSN, { max: DB_POOL_SIZE })
 
 /**
  * @api {get} /v1/transactions Get transactions
